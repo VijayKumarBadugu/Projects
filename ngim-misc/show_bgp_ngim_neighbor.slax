@@ -1,0 +1,266 @@
+/* This script returns the NGIM advertised route specified by peer and type
+ *
+ * Author: Jeff Loughridge
+ * 6/26/13
+ */
+ 
+version 1.0;
+
+ns junos = "http://xml.juniper.net/junos/*/junos";
+ns xnm = "http://xml.juniper.net/xnm/1.1/xnm";
+ns jcs = "http://xml.juniper.net/junos/commit-scripts/1.0";
+
+import "../import/junos.xsl";
+
+var $arguments = {
+    <argument> {
+        <name> "peer";
+        <description> "BGP peer IP address";
+	}
+	<argument> {
+		<name> "type";
+		<description> "NGIM type in decimal (1 to 7)";
+    }
+}
+
+param $peer;
+param $type = -1;
+param $extensive = -1;
+
+match / {
+	<op-script-results> {
+		
+		if(jcs:empty($peer)) {
+			<xsl:message terminate="yes"> "The BGP neighbor address must be specified.";
+		}
+	
+        
+		var $results-advertised := { call get-advertised-by-type(); }
+		<output> "Advertised routes";
+
+		if( $extensive == -1 ) {
+			
+			for-each($results-advertised/route) { 
+				<output> .; 
+			}
+		}		
+        
+        /*
+		if( $extensive == -1 ) {
+			for-each($results-advertised/route) { 
+				<output> .; 
+			}
+		}
+        */
+        
+		var $results-received := { call get-received-by-type(); }
+		
+		<output> "Received routes";
+		
+		if( $extensive == -1 ) {
+			
+			for-each($results-received/route) { 
+				<output> .; 
+			}
+		}
+		else {
+			call extensive-print($ns = $results-received);		
+		}
+	
+	}
+}
+
+/* Finds advertised routes specified by the peer and NGIM type at the command line 
+ * If user does not supply type, find all NGIM routes
+ * 
+ * Returns RTF with NGIM routes in <route> tags
+ */
+
+template get-advertised-by-type() {
+	var $command = "show route advertising-protocol bgp " _ $peer _ " table ngim.mvpn";
+	var $rpc = { <command> $command; }
+	var $results = jcs:invoke($rpc);
+	
+	var $type-with-colon = $type _ ":";
+
+	for-each($results//rt) {
+		var $rt-destination = string(rt-destination);
+
+		if(starts-with($rt-destination, $type-with-colon)) {
+			<route> $rt-destination;
+		}
+		
+		/* if no type specified, print all types */
+		else if($type == -1) { 
+			<route> $rt-destination; 
+		}
+	}
+}
+
+/* Finds received routes specified by the peer and NGIM type at the command line 
+ * If user does not supply type, find all NGIM routes
+ * 
+ * Returns RTF with NGIM routes in <route> tags
+ */
+template get-received-by-type() {
+	var $command = "show route receive-protocol bgp " _ $peer _ " table ngim.mvpn";
+	var $rpc = { <command> $command; }
+	var $results = jcs:invoke($rpc);
+	
+	var $type-with-colon = $type _ ":";
+	
+	for-each($results//rt) {
+		var $rt-destination = string(rt-destination);
+
+		if(starts-with($rt-destination, $type-with-colon)) {
+			<route> $rt-destination;
+		}
+		
+		/* if no type specified, print all types */
+		else if($type == -1) { 
+			<route> $rt-destination; 
+		}
+	}
+}
+
+template extensive-print($ns) {
+
+	for-each($ns/route) {
+		
+		
+		if( starts-with(string(.), "1:") ) {
+			var $type = "1 - Intra-AS I-PMSI AD Route";
+			
+			/* var $regex-ns := jcs:regex("^(.*):(.*:.*):(.*)/", string(.)); */
+			
+			var $regex-ns := jcs:regex("^1:(.*:.*):(.*)$", string(.));
+			
+			var $rd = string($regex-ns[2]);
+			var $sender-pe = string($regex-ns[3]);
+			
+			<output> $type;
+			<output> "RD: " _ $rd;
+			<output> "Sender PE lo0: " _ $sender-pe;
+			<output> "\n";
+	
+		}
+		else if( starts-with(string(.), "2:") ) {
+			var $type = "2 - Inter-AS I-PMSI AD Route";
+			
+			var $regex-ns := jcs:regex("^2:(.*:.*):(.*)$", string(.));
+			
+			var $rd = string($regex-ns[2]);
+			var $sender-pe-as = string($regex-ns[3]);
+			
+			<output> $type;
+			<output> "RD: " _ $rd;
+			<output> "Sender PE AS: " _ $sender-pe-as;
+			<output> "\n";
+		}
+		else if( starts-with(string(.), "3:")) {
+			/* this block untested */
+			var $type = "3 - S-PMSI AD Route";
+	
+			var $regex-ns := jcs:regex("^3:(.*:.*):(.*):(.*):(.*):(.*):(.*)$", string(.));
+			
+			var $rd = string($regex-ns[2]);
+			var $cs-mask = string($regex-ns[3]);
+			var $cs-using-s-pmsi = string($regex-ns[4]);
+			var $cg-mask = string($regex-ns[5]);
+			var $cg-using-s-pmsi = string($regex-ns[6]);
+			var $sender-pe-lo0 = string($regex-ns[7]);
+			
+			<output> $type;			
+			<output> "	RD: " _ $rd;
+			<output> "	Sender PE lo0: " _ $sender-pe-lo0;
+			/*<output> "	C-S Mask: " _ $cs-mask; */
+			<output> "	C-S Using S-PMSI: " _ $cs-using-s-pmsi;
+			/* <output> "	C-G Mask: " _ $cg-mask; */
+			<output> "	C-G Using S-PMSI: " _ $cg-using-s-pmsi;
+			<output> "\n";
+		}
+		else if( starts-with(string(.), "4:") ) {
+			var $type = "4 - Leaf AD Route";
+			
+			var $regex-ns := jcs:regex("^4:3:(.*:.*):(.*):(.*):(.*):(.*):(.*):(.*)$", string(.));
+			
+			var $rd = string($regex-ns[2]);
+			var $cs-mask = string($regex-ns[3]);
+			var $cs-using-s-pmsi = string($regex-ns[4]);
+			var $cg-mask = string($regex-ns[5]);
+			var $cg-using-s-pmsi = string($regex-ns[6]);
+			var $sender-pe-lo0 = string($regex-ns[7]);
+			var $acknowledging-pe-lo0 = string($regex-ns[8]);
+			
+			<output> $type;
+			<output> "Acknowleding PE: " _ $acknowledging-pe-lo0;
+			<output> "Acknowledges: ";
+			<output> "	Type 3";
+			
+			
+			
+			
+			<output> "	C-S: " _ $cs-using-s-pmsi;
+			<output> "	C-G: " _ $cg-using-s-pmsi;
+			<output> "	RD: " _ $rd; 
+			<output> "	PE lo0: " _ $sender-pe-lo0;
+			<output> "\n";
+		
+
+		}
+		else if( starts-with(string(.), "5:") ) {
+			
+			var $type = "5 - Source Active AD Route";
+			
+			var $regex-ns := jcs:regex("^5:(.*:.*):(.*):(.*):(.*):(.*)$", string(.));
+			
+			var $rd = string($regex-ns[2]);
+			var $cs-mask = string($regex-ns[3]);
+			var $cs = string($regex-ns[4]);
+			var $cg-mask = string($regex-ns[5]);
+			var $cg = string($regex-ns[6]);
+			
+			<output> $type;
+			<output> "Sender PE RD: " _ $rd;
+			/* <output> "C-S Mask: " _ $cs-mask; */
+			<output> "C-S: " _ $cs;
+			/* <output> "C-G Mask: " _ $cg-mask; */
+			<output> "C-G: " _ $cg;
+			<output> "\n";
+		}
+		else if( starts-with(string(.), "6:") ) {
+			var $type = "6 - Shared Tree Join Route";
+			
+			var $regex-ns := jcs:regex("^6:(.*:.*):(.*):(.*):(.*):(.*):(.*)$", string(.));
+			var $rd = string($regex-ns[2]);
+			var $as-upstream-PE = string($regex-ns[3]);
+			var $c-rp-mask = string($regex-ns[4]);
+			var $c-rp-address = string($regex-ns[5]);
+			var $cg-mask = string($regex-ns[6]);
+			var $cg = string($regex-ns[7]);
+			
+			<output> $type;
+			<output> "RD of upstream PE (toward RP): " _ $rd;
+			<output> "AS of upstream PE: " _ $as-upstream-PE;
+			/* <output> "C-RP Mask: " _ $c-rp-mask; */
+			<output> "C-RP Address: " _ $c-rp-address;
+			/* <output> "C-G Mask: " _ $cg-mask; */
+			<output> "C-G: " _ $cg;
+			<output> "\n";
+		}
+		else if( starts-with(string(.), "7:") ){
+			var $type = "7 - Source Tree Join Route";
+			
+			var $regex-ns := jcs:regex("^7:(.*:.*):(.*):(.*):(.*):(.*):(.*)$", string(.));
+			var $rd = string($regex-ns[2]);
+			var $as-upstream-PE = string($regex-ns[3]);
+			var $cs-mask = string($regex-ns[4]);
+			var $cs = string($regex-ns[5]);
+			var $cg-mask = string($regex-ns[6]);
+			var $cg = string($regex-ns[7]);
+			
+			<output> $type;
+			<output> "RD of upstream PE (toward C-RP): " _ $rd;
+			<output> "AS of upstream PE: " _ $as-upstream-PE;
+			/* <output> "C-S Mask: " _ $cs-mask; */
+			<output> 
