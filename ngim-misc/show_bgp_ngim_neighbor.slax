@@ -43,15 +43,7 @@ match / {
 			for-each($results-advertised/route) { 
 				<output> .; 
 			}
-		}		
-        
-        /*
-		if( $extensive == -1 ) {
-			for-each($results-advertised/route) { 
-				<output> .; 
-			}
 		}
-        */
         
 		var $results-received := { call get-received-by-type(); }
 		
@@ -263,4 +255,11 @@ template extensive-print($ns) {
 			<output> "RD of upstream PE (toward C-RP): " _ $rd;
 			<output> "AS of upstream PE: " _ $as-upstream-PE;
 			/* <output> "C-S Mask: " _ $cs-mask; */
-			<output> 
+			<output> "C-S: " _ $cs;
+			/* <output> "C-G Mask: " _ $cg-mask; */
+			<output> "C-G: " _ $cg;
+			<output> "\n";
+		}		
+	}
+}
+
