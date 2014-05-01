@@ -1,0 +1,269 @@
+/*
+$Id$
+*/
+
+version 1.0;
+ns junos = "http://xml.juniper.net/junos/*/junos";
+ns xnm = "http://xml.juniper.net/xnm/1.1/xnm";
+ns jcs = "http://xml.juniper.net/junos/commit-scripts/1.0";
+import "../import/junos.xsl";
+
+/*
+ * Author        : Nadeem Mohammad
+ * Version       : 1.0
+ * Last Modified : Jan 23rd, 2014
+ * Platform      : MX
+ * Release       : 10.4 and above
+ *
+ * Description   : This event script runs periodically and checks for pfe error
+		   on each pfe in the system by excuting following command
+		   "show si53xx 0x2100 0x6a si5368" looks for register 129
+		   value of 0x1c indicates error. if error is found it reports
+		   it to the system log message file.
+ *
+ * =============================================================================
+ * Revision History
+ * -----------------------------------------------------------------------------
+ * 1.0: Jan 23rd, 2014
+ *      - Initial Release
+ * 
+ *
+ * =============================================================================
+ *
+ * To set this up on your JUNOS device copy this script to the following folder:
+ * /var/db/scripts/op
+ *
+ * Then configure JUNOS with the following:
+ * 'set event-options event-script file PFE-100GE.slax'
+ *
+ * Make sure you name the script 'PFE-100GE' or change references in
+ * the script and JUNOS config to be whatever you named it.
+ *
+ */
+
+
+var $event-definition = {
+    <event-options> {
+        <generate-event> {
+        <name> "every-half-hour";
+        <time-interval> "300";
+        }
+        <policy> {
+            <name> "check-pfe-register";
+            <events> "every-half-hour";
+            <then> {
+                <event-script> {
+                <name> "PFE-100GE-EVENT.slax";
+                }
+            }
+        }
+    }
+}
+
+
+match / {
+
+  <event-script-results> {
+
+    var $chassis = jcs:invoke('get-chassis-inventory');
+
+      for-each ($chassis//chassis-module[starts-with(name, "FPC ")]) {  
+        var $reg1 = jcs:regex("(FPC) +([0-9]+)", ./name);
+	var $fpc = "fpc" _ $reg1[3];
+        call find_invalid_register_value( $fpc );
+     }
+  }
+}
+
+/*
+* Given a FPC:
+* Find value 0x1c for regiser 129, if exist log it
+*/
+template find_invalid_register_value( $fpc ) {
+
+    /* Build RPC and invoke it */
+    var $rpc = <request-pfe-execute> {
+      <target> $fpc;
+      <command> "show si53xx 0x2100 0x6a si5368";
+    }
+
+    var $string = jcs:invoke($rpc);
+
+    var $lines = jcs:break_lines($string);
+
+    for-each ($lines) {
+        if (contains(., 129)) {
+            var $pattern = "0x1c";
+            var $results = jcs:regex($pattern, .);
+	    if ($results) {
+		call check_and_perform_ccg_switchover($results, $fpc);
+	    }
+        }
+    }
+
+}
+
+template check_and_perform_ccg_switchover($results, $fpc) {
+
+    /* get the chassis synchronization information */
+   var $rpc = <get-clock-synchronization-information>;
+   var $result = jcs:invoke($rpc);
+
+   /* for each CCG look for master*/
+   for-each ($result/clock-synchronization[starts-with(clock-fru, "CCG")]) {	    
+	if (contains(./mastership-state, "Online - Standby")) {
+	    var $ccg_substr = jcs:split("[ ]", clock-fru);
+	    var $backup_slot = $ccg_substr[2];
+	    var $up-time-sec = ./synchronization-source-list/current-source/up-time/@junos:seconds;
+	    if ($up-time-sec > 3600) {
+	        var $master_slot := { call get_master_slot(); };
+	        call log_message($results, $fpc, $master_slot);
+/*	        call perform_ccg_switch_offline($master_slot);
+	        expr jcs:sleep(61);
+	        call check_master_online($backup_slot, $master_slot);*/
+	    } 
+	    else {
+                 call log_message($results, $fpc);
+            }
+        }
+   }
+}
+
+
+/*
+ * Goes through available CCG slots and finds the one that
+ * is the current Online - Master
+ */
+template get_master_slot() {
+    /* get the chassis synchronization information */
+   var $rpc = <get-clock-synchronization-information>;
+   var $result = jcs:invoke($rpc);
+
+   /* for each CCG look for master*/
+   for-each ($result/clock-synchronization[starts-with(clock-fru, "CCG")]) {
+	if (contains(./mastership-state, "Online - Master")) {
+	    var $ccg_substr = jcs:split("[ ]", clock-fru);
+	    var $ccg_slot = $ccg_substr[2];
+	    var $master_ccg_name = "CCG" _ $ccg_slot;
+	    <master-slot> {
+	        <slot> $ccg_slot;
+	    }
+	 }
+   }
+}
+
+
+/*
+ * Log to syslog
+ */
+template log_message($results, $fpc, $master_slot=255) {
+
+    if ($master_slot == 255) {
+	var $syslog_message = "Warning!!! " _ $fpc _
+	              " Invalied value for register 129: " _ $results _
+		      " CCG switchove cannot be performed at this time ";
+    	expr jcs:syslog( "pfe.error", $syslog_message);
+    }
+    else {
+	var $syslog_message = "Warning!!! " _ $fpc _
+	              " Invalied value for register 129: " _ $results _
+		      " CCG switchove can be performed using command: " _
+		      " request chassis ccg slot " _ $master_slot _ " offline";  
+    	expr jcs:syslog( "pfe.error", $syslog_message);
+    }
+}
+
+/*
+ * Given a slot number perform ccg switchover.
+ */
+template perform_ccg_switch_offline($master_slot) {
+
+    var $rpc = <request-chassis-ccg> {
+	<slot>$master_slot;
+	<offline>;
+    }
+    
+    var $results = jcs:invoke($rpc);
+}
+
+
+/*
+ * This template is called after ccg switchover is performed and its passed
+ * the value of old backup ccg slot number. it checks if the given slot
+ * has now transitioned to online - master. if so then logs an info message
+ * and brings the old master slot online again.
+ * if not then it logs an error message saying Backup still not online.
+*/
+template check_master_online($backup_slot, $master_slot) {
+
+    /* get the chassis synchronization information */
+   var $rpc = <get-clock-synchronization-information>;
+   var $result = jcs:invoke($rpc);
+
+   /* for each CCG look for master*/
+   for-each ($result/clock-synchronization[starts-with(clock-fru, "CCG")]) {
+        var $ccg_substr = jcs:split("[ ]", clock-fru);
+	var $slot = $ccg_substr[2];
+	if ($slot == $backup_slot &&
+	    contains(./mastership-state, "Online - Master")) {
+	    var $syslog_message = "Master CCG Online - in slot: " _ $slot;
+	    expr jcs:syslog( "pfe.error", $syslog_message);
+	    /* 
+	     * bring the old master slot online it should come online
+	     * as backup
+	     */
+	    call perform_ccg_switch_online($master_slot);
+	    expr jcs:sleep(61);
+	    call check_backup_online($master_slot);
+	}
+	else if ($slot == $backup_slot) {
+	    var $syslog_message = "Master CCG in slot: " _ $slot _
+				  " Still not in Online - Master state";
+	    expr jcs:syslog( "pfe.error", $syslog_message);
+	}
+    }
+} 
+
+
+/*
+ * Given a slot number perform ccg switchover.
+ */
+template perform_ccg_switch_online($master_slot) {
+
+    var $rpc = <request-chassis-ccg> {
+	<slot>$master_slot;
+	<online>;
+    }
+    
+    var $results = jcs:invoke($rpc);
+}
+
+
+/*
+ * This template is called to check if ccg in the old
+ * master slot has now transitioned to Online - Backup
+ * state if not then log an error.
+ */
+template check_backup_online($master_slot) {
+
+    /* get the chassis synchronization information */
+   var $rpc = <get-clock-synchronization-information>;
+   var $result = jcs:invoke($rpc);
+
+   /* for each CCG look for master*/
+   for-each ($result/clock-synchronization[starts-with(clock-fru, "CCG")]) {
+        var $ccg_substr = jcs:split("[ ]", clock-fru);
+	var $slot = $ccg_substr[2];
+	if ($slot == $master_slot &&
+	    contains(./mastership-state, "Online - Standby")) {
+	    var $syslog_message = "CCG in slot: " _ $slot _ 
+				  " Online - Backup";
+	    expr jcs:syslog( "pfe.error", $syslog_message);
+	}
+	else if ($slot == $master_slot) {
+	    var $syslog_message = "CCG in slot: " _ $slot _
+				  " Still not in Online - Standby state";
+	    expr jcs:syslog( "pfe.error", $syslog_message);
+	}
+    }
+} 

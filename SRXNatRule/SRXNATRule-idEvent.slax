@@ -1,0 +1,181 @@
+/*
+$Id$
+*/
+
+version 1.0;
+ns Junos = "http://xml.juniper.net/junos/*/junos";
+ns xnm = "http://xml.juniper.net/xnm/1.1/xnm";
+ns jcs = "http://xml.juniper.net/junos/commit-scripts/1.0";
+
+import "../import/junos.xsl";
+
+/*
+ * Author        : Nadeem Mohammad
+ * Version       : 1.0
+ * Last Modified : Jan 8th, 2014
+ * Platform      : HE SRX
+ * Release       : 10.4 and above
+ *
+ * Description   : This event script gets triggered from a commit and then
+		   checks for an invalid rule-id on SRX5800 or branch boxes
+		   it sleeps for 60 seconds first and then excutes pfe
+		   commands to find the invalid rule-id. defination of 
+		   invalid rule-id is an id that is greater than the max
+		   rule-id value. if an invalid rule-id is detected, script
+		   logs a pfe error to the syslog.
+ *
+ * =============================================================================
+ * Revision History
+ * -----------------------------------------------------------------------------
+ * 1.0: Feb 04, 2014
+ *      - Initial Release
+ * 
+ *
+ * =============================================================================
+ *
+ * To set this up on your JUNOS device copy this script to the following folder:
+ * /var/db/scripts/event
+ *
+ * Then configure JUNOS with the following:
+ * 'set event-options event-script file SRXNATRule-idEvent.slax'
+ *
+ * Make sure you name the script 'SRXNATRule-idEvent' or change references in
+ * the script and JUNOS config to be whatever you named it.
+ *
+ */
+
+/*
+ * Embeded policy to make this an event script 
+ * triggered on a commit
+ *
+var $event-definition = {
+  <event-options> {
+
+    <policy> {
+      <name>"commit";
+      <events>"ui_commit";
+
+      <then> {
+        <event-script> {
+          <name>"SRXNATRule-idEvent.slax";
+        }
+      }
+    }
+  }
+}*/
+
+param $delay = 60;
+
+
+match / {
+
+  <event-script-results> {
+
+      /*
+       * Sleep for 60 seconds to allow the rule base to be modified.
+       */
+      expr jcs:sleep($delay);
+
+      if ($product == "srx5800") {
+    	  var $chassis = jcs:invoke('get-chassis-inventory');
+
+    	  for-each ($chassis//re-name) {
+      	      var $node = .;
+
+      	      for-each (..//chassis/chassis-module[starts-with(name, "FPC ")]) {
+        	  var $reg1 = jcs:regex("(FPC) +([0-9]+)", ./name);
+        	  var $fpc = "fpc" _ $reg1[3];
+
+        	  if (contains(./description, "SPC")) {
+
+           	      for-each ( ./chassis-sub-module[starts-with(name, "PIC ")]){
+             	          var $reg2 = jcs:regex("(PIC) +([0-9]+)", ./name);
+            	          var $pic = "pic" _ $reg2[3];
+
+            	          var $PIC = $node _ "." _ $fpc _ "." _ $pic;
+
+            	          call find_invalid_rule_id( $PIC );
+		      }
+          	  }
+              }
+      	   }
+       } else if ($product == "srx240h-poe" || $product == "srx210h-poe") {
+           call find_invalid_rule_id( $PIC = "NULL");
+       }
+   }
+}
+
+/*
+* Given a SPC on SRC platform:
+* Find an invalid rule-id. invalid rule-id can be a
+* pair of duplicate rule-ids or an abnormal rule-id.
+*/
+template find_invalid_rule_id( $PIC) {
+
+    /* Build RPC and invoke it */
+    if ($PIC == "NULL") {
+        var $branch_rpc = <request-pfe-execute> {
+            <target> "fwdd";
+            <command> "show usp nat rule src-nat dst-addr-tree detail";
+        }
+        var $branch_results = jcs:invoke($branch_rpc);
+	
+	var $max_branch_value := { call get_max_rule_id($results = $branch_results);};
+
+	call find_and_log_invalid_rule_id($results = $branch_results, 
+	                                  $max_value = $max_branch_value,
+					  $PIC);
+
+    } 
+    else {
+	var $srx_rpc  = <request-pfe-execute> {
+            <target> "tnp";
+            <command> "show usp nat rule src-nat dst-addr-tree detail";
+            <tnp-name> $PIC;
+        }
+        var $srx_results = jcs:invoke($srx_rpc);
+	
+	var $max_srx_value := { call get_max_rule_id($results = $srx_results);};
+
+	call find_and_log_invalid_rule_id($results = $srx_results, $max_value = $max_srx_value,
+					  $PIC);
+    }
+}
+
+template get_max_rule_id($results)
+{
+    var $ident_pattern = "ident num: ([0-9]+)";
+    var $max_rule_id_str = jcs:regex($ident_pattern, $results);
+    var $max_rule_id = $max_rule_id_str[2];
+
+    <max_rule> {
+	<max> $max_rule_id;
+    }
+}
+
+
+template find_and_log_invalid_rule_id($results, $max_value, $PIC) {
+
+    var $lines = jcs:break_lines($results);
+
+    for-each ($lines) {
+        if (contains(., "rule-id")) {
+            var $pattern = "rule-id ([0-9]+)";
+            var $result = jcs:regex($pattern, .);
+            var $rule-id = $result[2];
+            if ($rule-id > $max_value) {
+/*	        <output> "Found Rule-id = " _ $rule-id;*/
+	        var $syslog_message1 = "MSS-Cloud operation issue that requires investigation";
+	        expr jcs:syslog("pfe.error", $syslog_message1);
+		var $print_line = jcs:split(":", .);
+	        if ($product == "srx5800") {
+	            var $syslog_message2 = "MSS-Cloud NAT error detected [" _ $print_line[1] _ "]";
+		    expr jcs:syslog("pfe.error", $syslog_message2);
+                } else {
+	            var $syslog_message3 = "MSS-Cloud NAT error detected [" _ $print_line[2] _ "]";
+		    expr jcs:syslog("pfe.error", $syslog_message3);
+                }
+            }
+        }
+    }
+}
