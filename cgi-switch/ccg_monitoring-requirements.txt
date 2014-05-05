@@ -1,0 +1,66 @@
+Event Script to detect and act upon PTX CCG Failure
+Requested by Amarjit Rahi <arahi@juniper.net>
+
+Platform : PTX5K
+JunOS Version : 12.1X48
+
+Reference PR/879456 for additional details on this request. This script would implement the functionality requested in the PR, in current production code as VZ can?t wait to certify and deploy new code.
+
+High level Overview
+
+The script will be configured as an event script to be executed at a configurable interval. Script will also have an option to take CCG switchover action. By default it should only generate a syslog and trap (if customer ask it should be easy to disable trap function in code).
+
+We also need to figure out how to keep the number of syslogs/traps to a meaningful low number when the event occurs, rather than flooding the system with logs.
+
+Functional Details
+
+1. Identify platform and FPCs in the chassis using the command
+
+show chassis hardware
+
+2. Periodically run this command on each PFE shell
+
+request pfe execute target <fpcx> command "show si53xx 0x2100 0x6a si5368"
+
+Look for register value 129. If a value of ?0x1c? is detected, we have found a problem condition and we need to generate a syslog and a trap. The message should include the FPC number reporting error condition.
+
+Also include exact command sequence to trigger CCG switchover in syslog.
+
+Example output below, actual output would be lot bigger. Keeping relevant entry for clarity.  Evaluate actual output in the script for exact match and make sure to avoid accidental substring matches.
+
+SNGFPC3(ML2.SJC7 vty)# show si53xx 0x2100 0x6a si5368 |grep 129
+         129      : 0x1c
+
+
+3. If enabled in script configuration carefully perform CCG switchover only if backup CCG is online and standby
+a. Identify current CCG master using this command. Also including sample output
+
+kamel@TL2.DFW27> show chassis synchronization
+Clock Synchronization Status :
+  Clock module on CCG 0
+    Current state            : Online - Standby
+    Current clock state      : locked to master CCG
+      Selected for           : 1 hour, 12 minutes, 10 seconds
+      Selected since         : 2014-01-28 14:02:25 UTC
+Clock Synchronization Status :
+  Clock module on CCG 1
+    Current state            : Online - Master
+    Current clock state      : internal
+      Selected for           : 1 hour, 12 minutes, 15 seconds
+      Selected since         : 2014-01-28 14:02:20 UTC
+      Deviation (in ppm)     : -0.10
+      Last deviation (in ppm): -0.10
+
+b. Note which CCG is ?Online-Master?
+c. Note the state of the OTHER CCG. If its not Online-Standby, do not perform a switchover and generate syslog trap for inability to perform switchover.
+d. Do not perform a switchover if it has been done in last 1 hour
+e. If backup is healthy and its OK to switch, offline master CCG using the command. Note the slot number will depend on who is master.
+
+request chassis ccg slot 0 offline
+
+f. Check to make sure old backup takes over as master now, if doesn?t happen in 1 minute, raise a trap/syslog.
+g. Online the CCG that was offline in step e.
+
+request chassis ccg slot 0 online
+
+h. Also confirm it comes back online-standby, else syslog/trap.
