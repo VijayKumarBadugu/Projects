@@ -1,0 +1,254 @@
+/*
+* Author           : Jeff Loughridge (jloughri@juniper.net)
+* Program          : bypass-op.slax
+* Modification     : 2014-03-14
+* Platform         : PTX Only
+* Description      : This op script finds occurrences of defect PR/955231
+* This script borrows templates from the ptx-pfemon.slax script
+* by Todd Walker (twalker@juniper.net). 
+*                     
+*
+* Copyright (c) 2014  Juniper Networks. All Rights Reserved.
+*
+* YOU MUST ACCEPT THE TERMS OF THIS DISCLAIMER TO USE THIS SOFTWARE,
+* IN ADDITION TO ANY OTHER LICENSES AND TERMS REQUIRED BY JUNIPER NETWORKS.
+*
+* JUNIPER IS WILLING TO MAKE THE INCLUDED SCRIPTING SOFTWARE AVAILABLE TO YOU
+* ONLY UPON THE CONDITION THAT YOU ACCEPT ALL OF THE TERMS CONTAINED IN THIS
+* DISCLAIMER. PLEASE READ THE TERMS AND CONDITIONS OF THIS DISCLAIMER
+* CAREFULLY.
+*
+* THE SOFTWARE CONTAINED IN THIS FILE IS PROVIDED "AS IS." JUNIPER MAKES NO
+* WARRANTIES OF ANY KIND WHATSOEVER WITH RESPECT TO SOFTWARE. ALL EXPRESS OR
+* IMPLIED CONDITIONS, REPRESENTATIONS AND WARRANTIES, INCLUDING ANY WARRANTY
+* OF NON-INFRINGEMENT OR WARRANTY OF MERCHANTABILITY OR FITNESS FOR A
+* PARTICULAR PURPOSE, ARE HEREBY DISCLAIMED AND EXCLUDED TO THE EXTENT
+* ALLOWED BY APPLICABLE LAW.
+*
+* IN NO EVENT WILL JUNIPER BE LIABLE FOR ANY DIRECT OR INDIRECT DAMAGES,
+* INCLUDING BUT NOT LIMITED TO LOST REVENUE, PROFIT OR DATA, OR
+* FOR DIRECT, SPECIAL, INDIRECT, CONSEQUENTIAL, INCIDENTAL OR PUNITIVE DAMAGES
+* HOWEVER CAUSED AND REGARDLESS OF THE THEORY OF LIABILITY ARISING OUT OF THE
+* USE OF OR INABILITY TO USE THE SOFTWARE, EVEN IF JUNIPER HAS BEEN ADVISED OF
+* THE POSSIBILITY OF SUCH DAMAGES.
+*/
+
+version 1.0;
+
+/* Standard Junos namespaces */
+ns junos = "http://xml.juniper.net/junos/*/junos";
+ns xnm = "http://xml.juniper.net/xnm/1.1/xnm";
+ns jcs = "http://xml.juniper.net/junos/commit-scripts/1.0";
+
+/* String namespace */
+ns str = "http://exslt.org/strings";
+
+import "../import/junos.xsl";
+
+
+/******************************************************************************/
+/* This is the main program logic.  We execute the pfe commands here and send */
+/* output to subroutines for processing                                       */
+/******************************************************************************/
+match / {
+
+  expr jcs:output("searching for bad selectors...");
+  var $jnx = jcs:open();
+
+  var $pfes := { call get-pfe($jnx); };
+  
+  for-each ($pfes/fpc) {
+    
+    /* send commands to the pfes*/
+    var $results := { call execute-pfe-command($jnx, 
+        $command="show nhdb hw unilist-sel", $fpc=fpc-module); };
+    
+    call process-results($raw=$results, $jnx, $fpc=fpc-module);
+  }  
+  
+  expr jcs:close( $jnx );
+  
+  expr jcs:output("script exiting normally");
+}
+
+/******************************************************************************/
+/* This template returns the interface associated with argument $IFL          */
+/******************************************************************************/
+template IFL-to-intf($IFL, $fpc, $jnx) {
+
+    var $cmd = <get-interface-information> { 
+        <extensive>;
+    };
+  
+    var $results = jcs:execute( $jnx, $cmd );
+    
+    for-each($results//logical-interface) {
+        var $this-ifl = string(local-index);
+        var $this-intf = string(name);
+        
+        if ($this-ifl == $IFL) {
+            <interface> $this-intf;
+        }
+    }
+    
+}
+
+/*******************************************************************/
+/* This template returns the bypass interface associated with      */          
+/* argument $selector                                              */
+/*******************************************************************/
+template find-bypass-intf($selector=$selector, $jnx, $fpc) {
+
+    var $command = "show nhdb hw unilist-sel " _ $selector;
+    
+    var $results := { call execute-pfe-command($jnx, $command=$command, $fpc=$fpc); };
+    
+    if ($results/error) {
+        expr jcs:output("   ERROR Sent: ", $results/error/sent, " Message:", 
+            $results/error/message);
+    }
+    else {
+        var $data = $results/data;
+        
+        var $lines = jcs:break-lines( $data );
+        for-each( $lines ) {
+            var $line = .;
+        
+            if( contains($line, "**") ) {
+                var $pattern = " +";
+                var $split-results = jcs:split($pattern, $line);
+                var $weight-index = string($split-results[2]);
+                var $weight = string($split-results[4]);
+                var $bypass_IFL = string($split-results[6]);
+                var $installed = string($split-results[7]);
+         
+                if($installed == "Yes") {
+                    var $IFL-results := { call IFL-to-intf($IFL=$bypass_IFL, $fpc=$fpc, $jnx=$jnx); };
+                    var $bypass_intf = string($IFL-results/interface);
+                    <interface> $bypass_intf;
+                }
+            }
+        }
+    }   
+}
+
+/*******************************************************************/
+/* This template determines if the defect is present               */
+/* and outputs a message if it is                                  */
+/*******************************************************************/
+template process-selector($raw, $selector, $fpc, $jnx) {
+    var $data = $raw/data;
+
+    /* Split into lines */
+    var $lines = jcs:break-lines( $data );
+    for-each( $lines ) {
+        var $line = .;
+        
+        /* matching for two asterisks is not elegant but it works */
+        if( contains($line, "**") ) {
+            var $pattern = " +";
+            var $split-results = jcs:split($pattern, $line);
+            var $weight-index = string($split-results[2]);
+            var $weight = string($split-results[4]);
+            var $primary_IFL = string($split-results[6]);
+            var $installed = string($split-results[7]);
+         
+            if($weight == 65535) {
+                var $IFL-results := { call IFL-to-intf($IFL=$primary_IFL, $fpc=$fpc, $jnx=$jnx); };
+                var $primary_intf = string($IFL-results/interface);
+                
+                var $find-results := { call find-bypass-intf($selector=$selector, $jnx=$jnx, $fpc=$fpc); }; 
+                
+                var $bypass_intf = string($find-results/interface);
+                
+                var $output-string = "BYPASS ISSUE PR/955231: " _ $fpc _  "/selector=" _ $selector _ " bypass_intf=" _ $bypass_intf _ " primary_intf=" _ $primary_intf;
+                    
+                expr jcs:output($output-string);                
+            }
+        }  
+    }
+}
+
+/************************************************************/
+/* This template processes the raw output from the PFE,     */
+/* grabs show nhdb hw unilist-sel output, and calls         */
+/* process-selector to do the majority of the work.         */
+/************************************************************/
+template process-results($raw, $jnx, $fpc) {
+
+  if ($raw/error) {
+    expr jcs:output("   ERROR Sent: ", $raw/error/sent, " Message:", 
+        $rax/error/message);
+  }
+  else {
+    var $data = $raw/data;
+    var $selector-ns = jcs:regex("GOT:  ID:([[:digit:]]+),", $data);
+    var $selector = string($selector-ns[2]);
+    var $command-string = "show nhdb hw unilist-sel " _ $selector;
+    
+    var $results := { call execute-pfe-command($jnx, $command=$command-string, $fpc=$fpc); };
+        
+    call process-selector($raw=$results, $selector=$selector, $fpc=$fpc, $jnx=$jnx);
+  }
+}
+
+
+/******************************************************************************/
+/* This template uses a show chassis hardware to determine the list of PFEs   */
+/* that should be targets for execution                                       */
+/******************************************************************************/
+template get-pfe ($jnx) {
+  var $cmd-hardware = <get-chassis-inventory>; 
+  var $rslt-hardware = jcs:execute( $jnx, $cmd-hardware );
+  
+  /* we will look for FPCs.  We need to massage the results to make the name */
+  /* friendly for use as a pfe target  */
+  for-each ($rslt-hardware/chassis/chassis-module[starts-with(name, "FPC")]) {
+    var $fpc-substr = jcs:split("[ ]", name);
+    var $fpc-num = $fpc-substr[2];
+    var $fpc-module = "fpc" _ $fpc-num;
+    
+    /* return the list of pfes as an XML document */
+    <fpc> {
+      <fpc-module> $fpc-module;
+      <name> name;
+      <description> description;
+      <model-number> model-number;
+    }
+  }
+}
+
+
+/******************************************************************************/
+/* This template executes pfe commands and checks for errrors in the output   */
+/******************************************************************************/
+template execute-pfe-command ($jnx, $command, $fpc) {
+
+  var $cmd-rpe = <request-pfe-execute> { 
+      <target> $fpc;
+      <command> $command;
+  };
+  var $rslt-rpe = jcs:execute($jnx, $cmd-rpe);
+  
+  /* grab the sent data from the return */
+  var $sent = jcs:regex("SENT: ([[:print:]]+)", $rslt-rpe);
+  
+  /* check for an error message */
+  var $err  = jcs:regex("GOT: (Syntax error [[:print:]]+)", $rslt-rpe);
+  
+  /* if we had an error send that back as an XML doc */
+  /* otherwise return the entire document retrieved  */
+  if (not(jcs:empty($err))) {
+    <error> { 
+      <message> $err[2];
+      <sent> $sent[2];
+    };
+  }
+  else {
+    <data> $rslt-rpe;
+  }
+}
+
+
+
+
