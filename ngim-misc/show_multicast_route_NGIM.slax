@@ -1,0 +1,309 @@
+version 1.0;
+
+ns junos = "http://xml.juniper.net/junos/*/junos";
+ns xnm = "http://xml.juniper.net/xnm/1.1/xnm";
+ns jcs = "http://xml.juniper.net/junos/commit-scripts/1.0";
+
+import "../import/junos.xsl";
+
+/* 
+ * The $arguments global variable is a special variable which JUNOS reads to build
+ * the CLI help for the script.  The command-line arguments will appear within the help
+ * along with their description as long as the following format is followed.
+ */
+ 
+ /*
+var $arguments = {
+    <argument> {
+        <name> "group-address";
+        <description> "The multicast group address";
+    }
+}
+
+param $group-address;
+*/
+
+/* open a connection to MGD for using SNMP scratch pad */
+var $connection = jcs:open(); 
+
+		
+		
+match / {
+	<op-script-results> {
+		
+		if( $connection//self::xnm:error ) {
+			<output> "unable to connect to MGD";
+		}
+
+		var $ShowPIMJoin = <get-pim-join-information> {
+			<extensive>;
+		}
+		
+		var $resultsShowPIMJoin = jcs:execute($connection, $ShowPIMJoin);
+		if( $resultsShowPIMJoin//self::xnm:error ) {
+			<output> "unable to execute RPC for  show pim join";
+		}
+		
+		var $ns_ShowPIMJoin := { call parse_ShowPIMJoin($node-set = $resultsShowPIMJoin); } 
+		
+		var $ShowMulticastRoute = <get-multicast-route-information> {
+			<extensive>;
+		}
+		
+		var $resultsShowMulticastRoute = jcs:execute($connection, $ShowMulticastRoute);
+		
+		for-each($resultsShowMulticastRoute//multicast-route) {
+			var $multicast-group-address = string(multicast-group-address);
+			var $multicast-source-address = string(multicast-source-address);
+			var $upstream-interface-name = string(upstream-interface-name);
+			var $ns_downstream-interface-names = downstream-interface-names;
+			var $forwarding-rate-kilobytes = forwarding-rate-kilobytes;
+			var $forwarding-rate-kilobits = $forwarding-rate-kilobytes * 8;
+			var $forwarding-rate-packets = string(forwarding-rate-packets);
+			var $forwarded-packet-count = string(forwarded-packet-count);
+			var $upstream-protocol = string(upstream-protocol);
+			
+			<output> "Group: " _ $multicast-group-address;
+			<output> "	Source: " _ $multicast-source-address;
+			
+			if($upstream-interface-name == "lsi.0") { /* this PE is egress for this S,G */
+				/*<output> "egress PE logic"; */
+				
+				<output> "	Upstream interface: ";
+				var $incoming-lsp-list := { call find-incoming-lsps($source = $multicast-source-address, $group = $multicast-group-address); }
+				
+				var $upstream-interface-string = {
+					for-each($incoming-lsp-list/lsp) { 
+						if(.) {
+							expr "lsp:" _ . _ " ";
+						}
+					}
+				}
+				
+				<output> "	Upstream interface list: " _ $upstream-interface-string;
+				
+				var $downstream-interface-string = {
+				
+					for-each($ns_downstream-interface-names/interface-name) {
+						if(.) {
+							expr . _ " ";
+						}
+					}
+				}
+				
+				<output> "	Downstream interface list: " _ $downstream-interface-string;				
+				<output> "	Statistics: " _ $forwarding-rate-kilobits _ " kbps, " _ $forwarding-rate-packets _ " pps, " _ $forwarded-packet-count _ " packets";
+				<output> "	Upstream protocol: " _ "BGP-" _ $upstream-protocol;
+				<output> "	Downstream  protocol: " _ "PIM"; 	
+			}
+			else if( not(jcs:empty($upstream-interface-name)) ) { /* This PE is ingress for this S,G */
+				/*<output> "ingress PE logic"; */
+				
+				<output> "	Upstream interface: " _ $upstream-interface-name;
+				
+				/* prepare RPCs for setting SNMP scratch pad "variables" */
+				var $put-rpc-physical = {
+					<request-snmp-utility-mib-set> {
+						<instance> "physical";
+						<object-type> "string";
+						<object-value> "true";
+					}
+				}
+				
+				var $put-rpc-ngim = {
+					<request-snmp-utility-mib-set> {
+						<instance> "ngim";
+						<object-type> "string";
+						<object-value> "true";
+					}
+				}
+	
+				var $outgoing-lsp-list := { call find-outgoing-lsps($source = $multicast-source-address, $group = $multicast-group-address); }
+			
+				/* this string may be empty if there are no outgoing NGIM LSPs */
+				var $lsp-string = {
+					for-each($outgoing-lsp-list/lsp) { 
+						if(.) {
+							expr " " _ .;
+						}
+					}
+				}
+				
+				var $interface-string = {
+					for-each($ns_ShowPIMJoin/mcast-entry[group == $multicast-group-address][source = $multicast-source-address]/downstream-intf-list/downstream-intf) {				
+						
+						var $loop-intf = string(.);
+				
+						if($loop-intf == "Pseudo-MVPN") {
+			
+							/* at least one OIF is an LSP 
+							* set the scratch pad instance for ngim to "true" */
+							var $dummy-var1 = jcs:execute( $connection, $put-rpc-ngim); 
+							if( $dummy-var1//self::xnm:error ) {
+								<output> "unable to set SNMP scratch pad variable for NGIM";
+							}
+						}
+						else { 
+							/* at least one OIF is a physical interface
+							* set the scratch pad instance for physical to "true" 
+							* note: this is suboptimal if many physical interfaces are in OIF */
+						
+							var $dummy-var2 = jcs:execute( $connection, $put-rpc-physical); 
+							if( $dummy-var2//self::xnm:error ) {
+								<output> "unable to set SNMP scratch pad variable for physical intf";
+							}
+							expr $loop-intf _ " "; /* construct the physical interface string */
+						}	
+					}
+				}
+				
+				
+				<output> "	Downstream interface list: " _ $interface-string _ $lsp-string;
+				<output> "	Statistics: " _ $forwarding-rate-kilobits _ " kbps, " _ $forwarding-rate-packets _ " pps, " _ $forwarded-packet-count _ " packets";
+				
+				/* set RPCs to retrieve scratch pad variables */
+				
+				var $get-rpc-physical = {
+					<get-snmp-object> {
+						<snmp-object-name> "jnxUtilStringValue.p.h.y.s.i.c.a.l";
+					}	
+				}
+				var $get-rpc-ngim = {
+					<get-snmp-object> {
+						<snmp-object-name> "jnxUtilStringValue.n.g.i.m";
+					}
+				}
+				
+				var $lsp-in-oif = jcs:execute( $connection, $get-rpc-ngim);
+				if( $lsp-in-oif//self::xnm:error ) {
+					<output> "unable to get SNMP scratch pad variable for NGIM";
+				}
+				var $physical-in-oif = jcs:execute( $connection, $get-rpc-physical);
+				if( $physical-in-oif//self::xnm:error ) {
+					<output> "unable to get SNMP scratch pad variable for physical intf";
+				}
+				
+				if ( ($lsp-in-oif/snmp-object/object-value == "true") && ($physical-in-oif/snmp-object/object-value == "true") ) {
+					<output> "	Upstream protocol: PIM BGP-MVPN";
+				}
+				else if ($lsp-in-oif/snmp-object/object-value == "true") { 
+					<output> "	Upstream protocol: BGP-MVPN";
+				}
+				else if($physical-in-oif/snmp-object/object-value == "true") {
+					<output> "	Upstream protocol: PIM";
+				}
+				else {
+					<output> "	Upstream protocol: Unknown";
+				}
+			}
+		}	
+
+		/* clear scratch pad */
+		var $clear-rpc-ngim = {
+			<request-snmp-utility-mib-clear> {
+				<instance> "ngim";
+				<object-type> "string";
+			}
+		}
+
+		var $clear-rpc-physical = {
+			<request-snmp-utility-mib-clear> {
+				<instance> "physical";
+				<object-type> "string";
+			}
+		}	
+
+		var $results-clear1 = jcs:execute( $connection, $clear-rpc-ngim );	
+		if( $results-clear1//self::xnm:error ) {
+			<output> "unable to clear SNMP scratch pad";
+		}
+		var $result-clear2 = jcs:execute( $connection, $clear-rpc-physical );
+		if( $results-clear1//self::xnm:error ) {
+			<output> "unable to clear SNMP scratch pad";
+		}	
+		
+		/* close connection to MGD */
+		expr jcs:close($connection);
+	}
+}
+
+
+template parse_ShowPIMJoin($node-set) {
+	for-each($node-set//join-group) {
+		var $group=multicast-group-address;
+		var $source=multicast-source-address;
+		
+		<mcast-entry> {
+			<group> $group;
+			<source> $source;
+			<downstream-intf-list> {
+				for-each(./downstream-interface/pim-interface-name) {
+					<downstream-intf> .;
+				}
+			}
+		}
+	}
+}
+	
+
+
+template find-incoming-lsps($source, $group) {
+
+	var $command-string = "show route table ngim";
+	var $rpc = { <command> $command-string; }
+	var $results = jcs:execute($connection, $rpc);
+	
+	for-each($results//route-table[table-name=="ngim.mvpn.0"]//rt) {
+	
+		/* we're looking for Type 3 routes only */
+		var $rt-destination = string(rt-destination);
+		if( starts-with($rt-destination, "3:") && contains($rt-destination, $source) && contains($rt-destination, $group)) {
+			
+			for-each(./rt-entry) {
+				var $lsp = nh/lsp-name _ "";
+				if( not(jcs:empty($lsp)) ) {
+					<lsp> $lsp;
+				}
+			}
+		}
+	}
+}
+
+template find-outgoing-lsps ($source, $group) {
+	
+	
+	var $rpc = <get-pim-join-information> {
+		<extensive>;
+	}
+	
+	var $results=jcs:execute($connection, $rpc);	
+	
+	for-each($results//join-group) {
+		var $loop-group=multicast-group-address;
+		var $loop-source=multicast-source-address;
+		if( (string(multicast-group-address) == $group) && (string(multicast-source-address) == $source)) {
+			for-each(./downstream-interface) {
+				var $downstream-intf = pim-interface-name;
+				
+		
+				var $command-string = "show route table ngim";
+				var $loop-rpc = { <command> $command-string; }
+				var $loop-results = jcs:execute($connection, $loop-rpc);
+	
+				for-each($loop-results//route-table[table-name=="ngim.mvpn.0"]//rt) {
+	
+					/* we're looking for Type 7 routes only */
+					var $rt-destination = rt-destination;
+					if( starts-with($rt-destination, "7:") && contains($rt-destination, $source) && contains($rt-destination, $group) ) {	
+						for-each(./rt-entry) {
+							var $lsp = nh/lsp-name _ "";
+							if( not(jcs:empty($lsp)) ) { 
+								<lsp> $lsp;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
