@@ -21,8 +21,8 @@ import "../import/junos.xsl";
 		   values to a accounting profile file and later reads back
 		   from it. it then calculates a delta for all the captured
 		   counters and then compares that delta with the specified
-		   treshold value that is not to be crossed. if delta 
-		   exceeds this treshold value it will log a pfe error.
+		   threshold value that is not to be crossed. if delta 
+		   exceeds this threshold value it will log a pfe error.
  *
  * =============================================================================
  * Revision History
@@ -66,84 +66,84 @@ var $event-definition = {
 var $arguments = {
         <argument> {
                 <name> "soft-input-control-drop-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "soft-input-high-drop-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "soft-input-medium-drop-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "soft-input-low-drop-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "soft-output-drop-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "hardware-input-drop-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "hardware-timeout-discards-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "hardware-truncated-key-discards-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "hardware-bits-to-test-discards-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "hardware-data-error-discards-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "hardware-stack-underflow-discards-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "hardware-stack-overflow-discards-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "hardware-normal-discards-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "hardware-extended-discards-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "hardware-invalid-interface-discards-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "hardware-info-cell-drops-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "hardware-fabric-drops-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "pfe-input-checksum-error-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
         <argument> {
                 <name> "pfe-output-mtu-error-tresh";
-                <description> "treshold value not to be crossed";
+                <description> "threshold value not to be crossed";
         }
 }
 
 
-/* Default treshold values for counters*/
+/* Default threshold values for counters*/
 
 param $soft-input-control-drop-tresh = 0;
 param $soft-input-high-drop-tresh = 0;
@@ -247,122 +247,122 @@ match / {
 
 	     	    var $delta-sft-in-c-drps = $second-sft-in-c-drps - $first-sft-in-c-drps;
 		    if ( $delta-sft-in-c-drps > $soft-input-control-drop-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $soft-input-control-drop-tresh _ " for software input control drops exceeded by: " _ $delta-sft-in-c-drps;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $soft-input-control-drop-tresh _ " for software input control drops exceeded by: " _ $delta-sft-in-c-drps;
                        expr jcs:syslog( "pfe.error", $syslog_message);
-/*		       <output> $first-pfe _ " Delta for software intput control drops: " _ $delta-sft-in-c-drps _ "crossed treshold of: " _ $soft-input-control-drop-tresh;*/
+/*		       <output> $first-pfe _ " Delta for software intput control drops: " _ $delta-sft-in-c-drps _ "crossed threshold of: " _ $soft-input-control-drop-tresh;*/
 		    }
 
 	     	    var $delta-sft-in-h-drps = $second-sft-in-h-drps - $first-sft-in-h-drps;
 		    if ( $delta-sft-in-h-drps > $soft-input-high-drop-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $soft-input-high-drop-tresh _ " for software input high drops exceeded by: " _ $delta-sft-in-h-drps;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $soft-input-high-drop-tresh _ " for software input high drops exceeded by: " _ $delta-sft-in-h-drps;
                        expr jcs:syslog( "pfe.error", $syslog_message);
-/*		       <output> $first-pfe _ " Delta for software intput high drops: " _ $delta-sft-in-h-drps _ "crossed treshold of: " _ $soft-input-high-drop-tresh;*/
+/*		       <output> $first-pfe _ " Delta for software intput high drops: " _ $delta-sft-in-h-drps _ "crossed threshold of: " _ $soft-input-high-drop-tresh;*/
 		    }
 
 	     	    var $delta-sft-in-m-drps = $second-sft-in-m-drps - $first-sft-in-m-drps;
 		    if ( $delta-sft-in-m-drps > $soft-input-medium-drop-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $soft-input-medium-drop-tresh _ " for software input medium drops exceeded by: " _ $delta-sft-in-m-drps;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $soft-input-medium-drop-tresh _ " for software input medium drops exceeded by: " _ $delta-sft-in-m-drps;
                        expr jcs:syslog( "pfe.error", $syslog_message);
-/*		       <output> $first-pfe _ " Delta for software intput medium drops: " _ $delta-sft-in-m-drps _ "crossed treshold of: " _ $soft-input-medium-drop-tresh;*/
+/*		       <output> $first-pfe _ " Delta for software intput medium drops: " _ $delta-sft-in-m-drps _ "crossed threshold of: " _ $soft-input-medium-drop-tresh;*/
 		    }
 
 	     	    var $delta-sft-in-l-drps = $second-sft-in-l-drps - $first-sft-in-l-drps;
 		    if ( $delta-sft-in-l-drps > $soft-input-low-drop-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $soft-input-low-drop-tresh _ " for software input low drops exceeded by: " _ $delta-sft-in-l-drps;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $soft-input-low-drop-tresh _ " for software input low drops exceeded by: " _ $delta-sft-in-l-drps;
                        expr jcs:syslog( "pfe.error", $syslog_message);
-		       <output> $first-pfe _ " Delta for software intput low drops: " _ $delta-sft-in-l-drps _ "crossed treshold of: " _ $soft-input-low-drop-tresh;
+		       <output> $first-pfe _ " Delta for software intput low drops: " _ $delta-sft-in-l-drps _ "crossed threshold of: " _ $soft-input-low-drop-tresh;
 		    }
 
 	     	    var $delta-sft-out-l-drps = $second-sft-out-l-drps - $first-sft-out-l-drps;
 		    if ( $delta-sft-out-l-drps > $soft-output-drop-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $soft-output-drop-tresh _ " for software output drops exceeded by: " _ $delta-sft-out-l-drps;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $soft-output-drop-tresh _ " for software output drops exceeded by: " _ $delta-sft-out-l-drps;
                        expr jcs:syslog( "pfe.error", $syslog_message);
-/*		       <output> $first-pfe _ " Delta for software output drops: " _ $delta-sft-out-l-drps _ "crossed treshold of: " _ $soft-output-drop-tresh;*/
+/*		       <output> $first-pfe _ " Delta for software output drops: " _ $delta-sft-out-l-drps _ "crossed threshold of: " _ $soft-output-drop-tresh;*/
 		    }
 
 	     	    var $delta-hrd-in-drps = $second-hrd-in-drps - $first-hrd-in-drps;
 		    if ( $delta-hrd-in-drps > $hardware-input-drop-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $hardware-input-drop-tresh _ " for hardware input drops exceeded by: " _ $delta-hrd-in-drps;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $hardware-input-drop-tresh _ " for hardware input drops exceeded by: " _ $delta-hrd-in-drps;
                        expr jcs:syslog( "pfe.error", $syslog_message);
-		       <output> $first-pfe _ " Delta for hardware input drops: " _ $delta-hrd-in-drps _ "crossed treshold of: " _ $hardware-input-drop-tresh;
+		       <output> $first-pfe _ " Delta for hardware input drops: " _ $delta-hrd-in-drps _ "crossed threshold of: " _ $hardware-input-drop-tresh;
 		    }
 
 	     	    var $delta-hrd-tme-dscd = $second-hrd-tme-dscd - $first-hrd-tme-dscd;
 		    if ( $delta-hrd-tme-dscd > $hardware-timeout-discards-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $hardware-timeout-discards-tresh _ " for hardware timeout discards exceeded by: " _ $delta-hrd-tme-dscd;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $hardware-timeout-discards-tresh _ " for hardware timeout discards exceeded by: " _ $delta-hrd-tme-dscd;
                        expr jcs:syslog( "pfe.error", $syslog_message);
 		    }
 
 	     	    var $delta-hrd-trnc-key-dscd = $second-hrd-trnc-key-dscd - $first-hrd-trnc-key-dscd;
 		    if ( $delta-hrd-trnc-key-dscd > $hardware-truncated-key-discards-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $hardware-truncated-key-discards-tresh _ " for hardware timeout discards exceeded by: " _ $delta-hrd-trnc-key-dscd;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $hardware-truncated-key-discards-tresh _ " for hardware timeout discards exceeded by: " _ $delta-hrd-trnc-key-dscd;
                        expr jcs:syslog( "pfe.error", $syslog_message);
 		    }
 
 	     	    var $delta-hrd-bts-to-tst-dscd = $second-hrd-bts-to-tst-dscd - $first-hrd-bts-to-tst-dscd;
 		    if ( $delta-hrd-bts-to-tst-dscd > $hardware-bits-to-test-discards-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $hardware-bits-to-test-discards-tresh _ " for hardware bits to test discards exceeded by: " _ $delta-hrd-bts-to-tst-dscd;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $hardware-bits-to-test-discards-tresh _ " for hardware bits to test discards exceeded by: " _ $delta-hrd-bts-to-tst-dscd;
                        expr jcs:syslog( "pfe.error", $syslog_message);
 		    }
 
 	            var $delta-hrd-data-err-dscd = $second-hrd-data-err-dscd - $first-hrd-data-err-dscd;
 		    if ( $delta-hrd-data-err-dscd > $hardware-data-error-discards-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $hardware-data-error-discards-tresh _ " for hardware data error discards exceeded by: " _ $delta-hrd-data-err-dscd;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $hardware-data-error-discards-tresh _ " for hardware data error discards exceeded by: " _ $delta-hrd-data-err-dscd;
                        expr jcs:syslog( "pfe.error", $syslog_message);
 		    }
 
 	            var $delta-hrd-stck-under-dscd = $second-hrd-stck-under-dscd - $first-hrd-stck-under-dscd;
 		    if ( $delta-hrd-stck-under-dscd > $hardware-stack-underflow-discards-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $hardware-stack-underflow-discards-tresh _ " for hardware stack underflow discards exceeded by: " _ $delta-hrd-stck-under-dscd;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $hardware-stack-underflow-discards-tresh _ " for hardware stack underflow discards exceeded by: " _ $delta-hrd-stck-under-dscd;
                        expr jcs:syslog( "pfe.error", $syslog_message);
 		    }
 
 	            var $delta-hrd-stck-ovr-dscd = $second-hrd-stck-ovr-dscd - $first-hrd-stck-ovr-dscd;
 		    if ( $delta-hrd-stck-ovr-dscd > $hardware-stack-overflow-discards-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $hardware-stack-overflow-discards-tresh _ " for hardware stack overflow discards exceeded by: " _ $delta-hrd-stck-ovr-dscd;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $hardware-stack-overflow-discards-tresh _ " for hardware stack overflow discards exceeded by: " _ $delta-hrd-stck-ovr-dscd;
                        expr jcs:syslog( "pfe.error", $syslog_message);
 		    }
 
 	            var $delta-hrd-bad-rt-dscd = $second-hrd-bad-rt-dscd - $first-hrd-bad-rt-dscd;
 		    if ( $delta-hrd-bad-rt-dscd > $hardware-normal-discards-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $hardware-normal-discards-tresh _ " for hardware normal dscd exceeded by: " _ $delta-hrd-bad-rt-dscd;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $hardware-normal-discards-tresh _ " for hardware normal dscd exceeded by: " _ $delta-hrd-bad-rt-dscd;
                        expr jcs:syslog( "pfe.error", $syslog_message);
-/*		       <output> $first-pfe _ " Delta for hardware normal drops: " _ $delta-hrd-bad-rt-dscd _ "crossed treshold of: " _ $hardware-normal-discards-tresh;*/
+/*		       <output> $first-pfe _ " Delta for hardware normal drops: " _ $delta-hrd-bad-rt-dscd _ "crossed threshold of: " _ $hardware-normal-discards-tresh;*/
 		    }
 
 	            var $delta-hrd-nxthp-dscd = $second-hrd-nxthp-dscd - $first-hrd-nxthp-dscd;
 		    if ( $delta-hrd-nxthp-dscd > $hardware-extended-discards-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $hardware-extended-discards-tresh _ " for hardware extended dscd exceeded by: " _ $delta-hrd-nxthp-dscd;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $hardware-extended-discards-tresh _ " for hardware extended dscd exceeded by: " _ $delta-hrd-nxthp-dscd;
                        expr jcs:syslog( "pfe.error", $syslog_message);
 		    }
 
 	            var $delta-hrd-invld-intf-dscd = $second-hrd-invld-intf-dscd - $first-hrd-invld-intf-dscd;
 		    if ( $delta-hrd-invld-intf-dscd > $hardware-invalid-interface-discards-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $hardware-invalid-interface-discards-tresh _ " for hardware invalid interface dscd exceeded by: " _ $delta-hrd-invld-intf-dscd;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $hardware-invalid-interface-discards-tresh _ " for hardware invalid interface dscd exceeded by: " _ $delta-hrd-invld-intf-dscd;
                        expr jcs:syslog( "pfe.error", $syslog_message);
 		    }
 
 	            var $delta-hrd-info-cell-dscd = $second-hrd-info-cell-dscd - $first-hrd-info-cell-dscd;
 		    if ( $delta-hrd-invld-intf-dscd > $hardware-info-cell-drops-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $hardware-info-cell-drops-tresh _ " for hardware info cell drops exceeded by: " _ $delta-hrd-info-cell-dscd;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $hardware-info-cell-drops-tresh _ " for hardware info cell drops exceeded by: " _ $delta-hrd-info-cell-dscd;
                        expr jcs:syslog( "pfe.error", $syslog_message);
 		    }
 
 	            var $delta-hrd-fabric-dscd = $second-hrd-fabric-dscd - $first-hrd-fabric-dscd;
 		    if ( $delta-hrd-fabric-dscd > $hardware-fabric-drops-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $hardware-fabric-drops-tresh _ " for hardware fabric drops exceeded by: " _ $delta-hrd-fabric-dscd;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $hardware-fabric-drops-tresh _ " for hardware fabric drops exceeded by: " _ $delta-hrd-fabric-dscd;
                        expr jcs:syslog( "pfe.error", $syslog_message);
 		    }
 
 	            var $delta-chip-inpt-chksm-errs = $second-chip-inpt-chksm-errs - $first-chip-inpt-chksm-errs;
 		    if ( $delta-chip-inpt-chksm-errs > $pfe-input-checksum-error-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $pfe-input-checksum-error-tresh _ " for pfe input checksum errors exceeded by: " _ $delta-chip-inpt-chsm-errs;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $pfe-input-checksum-error-tresh _ " for pfe input checksum errors exceeded by: " _ $delta-chip-inpt-chsm-errs;
                        expr jcs:syslog( "pfe.error", $syslog_message);
 		    }
 
 	            var $delta-chip-out-mtu-errs = $second-chip-out-mtu-errs - $first-chip-out-mtu-errs;
 		    if ( $delta-chip-out-mtu-errs > $pfe-output-mtu-error-tresh ) {
-	               var $syslog_message = $first-pfe _ " Treshold value: " _ $pfe-output-mtu-error-tresh _ " for pfe output mtu errors exceeded by: " _ $delta-chip-out-mtu-errs;
+	               var $syslog_message = $first-pfe _ " threshold value: " _ $pfe-output-mtu-error-tresh _ " for pfe output mtu errors exceeded by: " _ $delta-chip-out-mtu-errs;
                        expr jcs:syslog( "pfe.error", $syslog_message);
 		    }
 	        }
