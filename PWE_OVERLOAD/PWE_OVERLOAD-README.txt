@@ -7,11 +7,13 @@
  * Assumption:
  *                The user of this script needs to create a BFD session between
  *                the p-core (CE) routers and the PE routers. This BFD session
- *                should run on and ifl which is on the same IFD on which 
- *                OSPF adjacencies are formed between the pcore routers over the 
- *                l2circuit connection. During the maintenance window user needs
+ *                MUST run on the CITM ifl with vlan-id value of 100. This ifl
+ *                MUST be on the same IFD on which OSPF adjacencies are formed 
+ *                between the pcore routers over the l2circuit connection. 
+ *                During the maintenance window user needs
  *                to bring down this BFD session by bringing down the IFL on 
- *                which this BFD session is running. this is done on the PE. 
+ *                which this BFD session is running. this is will be done via
+ *                an op script running on the PE (TL) router. 
  *
  * Description   : This event script is simulating an ospf overload functionality.
  *                 It has two parts. local part which runs on the local router
@@ -22,9 +24,12 @@
  *                 going down and this acts as the TRIGGER for *this* script
  *                 running on the local router to run.
  *
- *                 As this script runs when BFD session goes down, it looks
- *                 for rest of the IFLs on the IFD on which the BFD session
- *                 just went down. All these ifls are where OSPF session is
+ *                 As this script runs when BFD session goes down, it first 
+ *                 checks the associated ifl on which the BFD session went
+ *                 down. if the ifl is on vlan-id 100 it will then compare
+ *                 the IFD of this IFL with the IFD of the ospf interface.
+ *                 If the IFD matched, script will then find rest of the ifls
+ *                 on this IFD. All these ifls are where OSPF session is
  *                 running between the local router (CE1) and the remote router
  *                 (CE2). After finding all these IFLs it raises the ospf metric
  *                 value on all these IFLs. it first finds the existing metric

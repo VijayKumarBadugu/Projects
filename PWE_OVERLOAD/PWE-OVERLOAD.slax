@@ -129,10 +129,12 @@ match / {
 
     var $ifd-substr = jcs:split('[.]', $interface);
     var $ifd = $ifd-substr[1];
-    var $syslog_message_ifd = "BFD IFD == " _ $ifd _ " " _ $interface;
+    var $vlan-id = $ifd-substr[2];
+    var $syslog_message_ifd = "BFD IFD == " _ $ifd _ " vlan-id = " _ $vlan-id _ "intf = " _ $interface;
     expr jcs:syslog("user.info", $syslog_message_ifd);
 
-
+    /* only excute if vlan-id is 100 which is the CITM IFL */
+    if ($vlan-id == "100") {
     var $ospf-nbr-rpc = <get-ospf-neighbor-information>;
     var $results = jcs:invoke($ospf-nbr-rpc);
 
@@ -170,8 +172,7 @@ match / {
            }
         }
       }
-      var $ospf-nbr-message = "OSPF SAVED NBR = " _ $ospf-nbr;
-      expr jcs:syslog("user.info", $ospf-nbr-message);
+      }
    }
 }
 
