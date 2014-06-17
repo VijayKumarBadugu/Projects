@@ -100,7 +100,7 @@ var $event-definition = {
 
       <then> {
         <event-script> {
-          <name> "pw-overload.slax";
+          <name> "PWE-OVERLOAD.slax";
 	  <arguments> {
 		<name> "new-state";
 	        <value> "{$$.state}";
