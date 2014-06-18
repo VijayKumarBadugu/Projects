@@ -80,6 +80,9 @@
  * copy PWE-OVERLOAD-REMOTE.slax (op script) to /var/db/scripts/op
  * on both RE0 and RE1 where applicable.
  *
+ * Then configure JUNOS with the following:
+ * 'set system scripts op file PWE-OVERLOAD-REMOTE.slax'
+ *
  * COMMANDS USED:
  *
  * PWE-OVERLOAD-LOCAL.slax
