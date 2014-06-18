@@ -40,7 +40,7 @@ import "../import/junos.xsl";
  * /var/db/scripts/op
  *
  *
- * Make sure you name the script 'pw-overload-remote' or change references in
+ * Make sure you name the script 'PWE-OVERLOAD-REMOTE' or change references in
  * the script and JUNOS config to be whatever you named it.
  *
  */

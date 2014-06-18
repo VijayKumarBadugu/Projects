@@ -67,25 +67,26 @@
  *
  *    CE1------PE1--------PE2------CE2.
  *
- * ON LOCAL ROUTER WHERE BFD SESSION IS RUNNING (CE1)
+ * ON LOCAL ROUTER (CE1)
  *
- * copy pw-overload.slax to
- * /var/db/scripts/event
+ * copy PWE-OVERLOAD-LOCAL.slax (event script) to
+ * /var/db/scripts/event on both RE0 and RE1 where applicable.
  *
  * Then configure JUNOS with the following:
- * 'set event-options event-script file pw-overload.slax'
+ * 'set event-options event-script file PWE-OVERLOAD-LOCAL.slax'
  *
- * ON REMOTE ROUTER WHERE OSPF NBRS EXISTS (CE2)
+ * ON REMOTE ROUTER (CE2)
  *
- * copy pw-overload-remote.slax in /var/db/scripts/op
+ * copy PWE-OVERLOAD-REMOTE.slax (op script) to /var/db/scripts/op
+ * on both RE0 and RE1 where applicable.
  *
  * COMMANDS USED:
  *
- * pw-overload.slax (local)
+ * PWE-OVERLOAD-LOCAL.slax
  * show ospf neighbors. To extract the ospf nbr addr and ospf ifl
  * show ospf intf detail. To get the existing metric value
  * 
- * pw-overload-remote.slax (remote)
+ * PWE-OVERLOAD-REMOTE.slax
  * show interface terse. To locate the ospf nbr and the corrisponding ifl.
  * show ospf intf detail. To get the existing metric values.
  *

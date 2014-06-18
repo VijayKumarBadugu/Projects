@@ -66,6 +66,8 @@ import "../import/junos.xsl";
  * -----------------------------------------------------------------------------
  * 1.0: May 5th, 2014
  *      - Initial Release
+ * 2.0: june 16th, 2014
+ *      - Changed name of the scripts
  * 
  *
  * =============================================================================
@@ -74,9 +76,9 @@ import "../import/junos.xsl";
  * /var/db/scripts/event
  *
  * Then configure JUNOS with the following:
- * 'set event-options event-script file pw-overload.slax'
+ * 'set event-options event-script file PWE-OVERLOAD-LOCAL.slax'
  *
- * Make sure you name the script 'pw-overload' or change references in
+ * Make sure you name the script 'PWE-OVERLOAD-LOCAL' or change references in
  * the script and JUNOS config to be whatever you named it.
  *
  */
@@ -100,7 +102,7 @@ var $event-definition = {
 
       <then> {
         <event-script> {
-          <name> "PWE-OVERLOAD.slax";
+          <name> "PWE-OVERLOAD-LOCAL.slax";
 	  <arguments> {
 		<name> "new-state";
 	        <value> "{$$.state}";
@@ -235,7 +237,7 @@ template change_remote_metric($remote-router, $ospf-nbr, $state) {
 
              var $op-rpc = {
                 <op-script> {
-                   <script> "pw-overload-remote";
+                   <script> "PWE-OVERLOAD-REMOTE";
                        <ospf-nbr> $ospf-nbr;
                        <state> $state;
                 }  
