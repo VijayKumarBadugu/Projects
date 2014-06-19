@@ -132,11 +132,11 @@ match / {
     var $ifd-substr = jcs:split('[.]', $interface);
     var $ifd = $ifd-substr[1];
     var $vlan-id = $ifd-substr[2];
-    var $syslog_message_ifd = "BFD IFD == " _ $ifd _ " vlan-id = " _ $vlan-id _ "intf = " _ $interface;
-    expr jcs:syslog("user.info", $syslog_message_ifd);
 
     /* only excute if vlan-id is 100 which is the CITM IFL */
     if ($vlan-id == "100") {
+    var $syslog_message_ifd = "BFD state changed on CITM interface " _ $interface;
+    expr jcs:syslog("user.info", $syslog_message_ifd);
     var $ospf-nbr-rpc = <get-ospf-neighbor-information>;
     var $results = jcs:invoke($ospf-nbr-rpc);
 
@@ -144,8 +144,7 @@ match / {
         var $ospf-interface = ./interface-name;
 	var $ospf-interface-substr = jcs:split('[.]', $ospf-interface);
 	var $ospf-ifd = $ospf-interface-substr[1];
-        var $syslog_message_intf = "OSPF INTF = " _ $ospf-interface _ "OSPF IFD " _ $ospf-ifd _ "IFD " _ $ifd;
-        expr jcs:syslog("user.info", $syslog_message_intf);
+
 	if ($ospf-ifd == $ifd) {
 
 	   /* get the nbr address and the router-id of the remote peer */
@@ -159,15 +158,17 @@ match / {
 	   var $ospf-intf-results = jcs:invoke($ospf-intf-rpc);
            for-each ($ospf-intf-results/ospf-interface[starts-with(interface-name, $ospf-interface)]) {
               var $old-metric = ./interface-cost;
-              var $syslog_message_metric = "OSPF METRIC = " _ $old-metric;
-              expr jcs:syslog("user.info", $syslog_message_metric);
 
               if ($new-state == "down") {
                   var $new-down-metric = $old-metric + 30000;
+                  var $syslog_message_down_metric = "BFD down on " _ $interface _ " changing OSPF metric to " _ $new-down-metric _ " on OSPF interface " _ $ospf-interface;
+                  expr jcs:syslog("user.info", $syslog_message_down_metric);
                   call change_metric($metric = $new-down-metric, $ospf-interface);
 	          call change_remote_metric($remote-router, $ospf-nbr, $state = "down");
               } else {
                   var $new-up-metric = $old-metric - 30000;
+                  var $syslog_message_up_metric = "BFD UP on " _ $interface _ " changing OSPF metric to " _ $new-up-metric _ " on OSPF interface " _ $ospf-interface;
+                  expr jcs:syslog("user.info", $syslog_message_up_metric);
 	          call change_metric($metric = $new-up-metric, $ospf-interface);
                   call change_remote_metric($remote-router, $ospf-nbr, $state = "up");
               }
@@ -203,8 +204,6 @@ template change_metric($metric, $ospf-interface) {
       }
 
       /* Load and commit the configuration change */
-      var $syslog_message_conf = "CHANGE = " _ $change;
-      expr jcs:syslog("user.info", $syslog_message_conf);
       var $connection = jcs:open();
       var $config_results := {
              call jcs:load-configuration( $connection, $configuration = $change );
@@ -223,7 +222,7 @@ template change_remote_metric($remote-router, $ospf-nbr, $state) {
 	     * Connect to the remote peer and excute the op script to adjust ospf
 	     * metric on the remote peer
 	     */
-             var $syslog_message_op = "OSPF PEER = " _ $remote-router _ " NBR " _ $ospf-nbr;
+             var $syslog_message_op = "Connecting to Remote Peer " _ $remote-router _ " Executing op script passing OSP nbr " _ $ospf-nbr;
              expr jcs:syslog("user.info", $syslog_message_op);
 
 	     var $remote-user = "jnpr";

@@ -65,23 +65,20 @@ match / {
             var $ospf-nbr-addr-substr = jcs:split('[/]', $ospf-nbr-addr);
             var $local-ospf-nbr = $ospf-nbr-addr-substr[1];
 
-            var $syslog_message_ospf_nbr2 = "OSPF NBR ADDR = " _ $ospf-nbr-addr _ " SUBSTR " _ $ospf-nbr-addr-substr _ " LOCAL NBR = " _ $local-ospf-nbr;
-            expr jcs:syslog("user.info", $syslog_message_ospf_nbr2);
-     
             if ($local-ospf-nbr == $ospf-nbr) {
                 var $ospf-interface = ../name;
-                var $syslog_message_ospf_intf = "OSPF INTF = " _ $ospf-interface;
-                expr jcs:syslog("user.info", $syslog_message_ospf_intf);
                
                 var $old-metric := { call get_ospf_metric($ospf-interface); };
-                var $syslog_message_metric = "OSPF METRIC = " _ $old-metric;
-                expr jcs:syslog("user.info", $syslog_message_metric);
 
                 if ($state == "down") {
                    var $new-down-metric = $old-metric + 30000;
+                   var $syslog_message_down_metric = " changing OSPF metric to " _ $new-down-metric _ " on OSPF interface " _ $ospf-interface;
+                   expr jcs:syslog("user.info", $syslog_message_down_metric);
                    call change_metric($metric = $new-down-metric, $ospf-interface);
                 } else {
                    var $new-up-metric = $old-metric - 30000;
+                   var $syslog_message_up_metric = " changing OSPF metric to " _ $new-up-metric _ " on OSPF interface " _ $ospf-interface;
+                   expr jcs:syslog("user.info", $syslog_message_up_metric);
                    call change_metric($metric = $new-up-metric, $ospf-interface);
                 }
             }
@@ -113,8 +110,6 @@ template change_metric($metric, $ospf-interface) {
       }
 
       /* Load and commit the configuration change */
-      var $syslog_message_conf = "CHANGE = " _ $change;
-      expr jcs:syslog("user.info", $syslog_message_conf);
       var $connection = jcs:open();
       var $config_results := {
              call jcs:load-configuration( $connection, $configuration = $change );
