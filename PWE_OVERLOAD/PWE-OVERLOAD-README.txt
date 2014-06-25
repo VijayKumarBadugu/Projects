@@ -13,7 +13,9 @@
  *                During the maintenance window user needs
  *                to bring down this BFD session by bringing down the IFL on 
  *                which this BFD session is running. this is will be done via
- *                an op script running on the PE (TL) router. 
+ *                an op script (PWE-OVERLOAD-TL) running on the PE (TL) router. 
+ *                Please refer to the PWE-OVERLOAD-TL-README.txt file for the 
+ *                functionality and working of this op script.
  *
  * Description   : This event script is simulating an ospf overload functionality.
  *                 It has two parts. local part which runs on the local router
