@@ -42,7 +42,7 @@ import "../import/junos.xsl";
 
 var $arguments = {
         <argument> {
-                <case-number> "jtac case number";
+                <name> "case-number";
                 <description> "jtac case number";
         }
 }
@@ -58,16 +58,12 @@ match / {
      var $support-file-name = $case-number _ ".log";
 
      /* get the support information and save it to /var/log */
-     var $request-rpc = <get-support-information format="text">;
-     var $config = jcs:invoke( $request-rpc );
-     var $writing = <file-put> {
-         <filename>"/var/log/" _ $support-file-name;
-         <encoding> "ascii";
-         <permission> "644";
-         <delete-if-exist>;
-         <file-contents> $config;
+     var $cmd = <command format="text"> "request support information";
+     var $result = jcs:invoke($cmd);
+     <xsl:document method="text" href="/var/log/" _ $support-file-name> {
+          copy-of $result;
      }
-     var $result-writing = jcs:invoke( $writing );
+
 
 
      /* Archive contents of /var/log dir */

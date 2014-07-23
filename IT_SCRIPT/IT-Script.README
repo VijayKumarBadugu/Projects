@@ -1,5 +1,0 @@
-Description  : This op script takes case number as an argument and then
-               1. Gathers system support info in /var/log/case-number.log file
-               2. compress contents of /var/log/ and put it in /var/tmp/case-number.tgz
-               3. Anonymous ftp the case-number.tgz to ftp.juniper.net and put it in
-                  /put/incoming/ directory. 
