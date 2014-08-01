@@ -1,0 +1,298 @@
+/*
+* Author           : Todd Walker (twalker@juniper.net)
+* Program          : TQ-pgcredit-chk.slax
+* Modification     : 2013-10-11
+* Platform         : PTX Only
+* Description      : This program checks for page credit exhaustion on TQ chip.
+*
+*
+* Copyright (c) 2013  Juniper Networks. All Rights Reserved.
+*
+* YOU MUST ACCEPT THE TERMS OF THIS DISCLAIMER TO USE THIS SOFTWARE,
+* IN ADDITION TO ANY OTHER LICENSES AND TERMS REQUIRED BY JUNIPER NETWORKS.
+*
+* JUNIPER IS WILLING TO MAKE THE INCLUDED SCRIPTING SOFTWARE AVAILABLE TO YOU
+* ONLY UPON THE CONDITION THAT YOU ACCEPT ALL OF THE TERMS CONTAINED IN THIS
+* DISCLAIMER. PLEASE READ THE TERMS AND CONDITIONS OF THIS DISCLAIMER
+* CAREFULLY.
+*
+* THE SOFTWARE CONTAINED IN THIS FILE IS PROVIDED "AS IS." JUNIPER MAKES NO
+* WARRANTIES OF ANY KIND WHATSOEVER WITH RESPECT TO SOFTWARE. ALL EXPRESS OR
+* IMPLIED CONDITIONS, REPRESENTATIONS AND WARRANTIES, INCLUDING ANY WARRANTY
+* OF NON-INFRINGEMENT OR WARRANTY OF MERCHANTABILITY OR FITNESS FOR A
+* PARTICULAR PURPOSE, ARE HEREBY DISCLAIMED AND EXCLUDED TO THE EXTENT
+* ALLOWED BY APPLICABLE LAW.
+*
+* IN NO EVENT WILL JUNIPER BE LIABLE FOR ANY DIRECT OR INDIRECT DAMAGES,
+* INCLUDING BUT NOT LIMITED TO LOST REVENUE, PROFIT OR DATA, OR
+* FOR DIRECT, SPECIAL, INDIRECT, CONSEQUENTIAL, INCIDENTAL OR PUNITIVE DAMAGES
+* HOWEVER CAUSED AND REGARDLESS OF THE THEORY OF LIABILITY ARISING OUT OF THE
+* USE OF OR INABILITY TO USE THE SOFTWARE, EVEN IF JUNIPER HAS BEEN ADVISED OF
+* THE POSSIBILITY OF SUCH DAMAGES.
+*/
+
+version 1.0;
+
+/* Standard Junos namespaces */
+ns junos = "http://xml.juniper.net/junos/*/junos";
+ns xnm = "http://xml.juniper.net/xnm/1.1/xnm";
+ns jcs = "http://xml.juniper.net/junos/commit-scripts/1.0";
+
+/* String namespace */
+ns str = "http://exslt.org/strings";
+
+import "../import/junos.xsl";
+
+/******************************************************************************/
+/*                                                                            */
+/******************************************************************************/
+
+var $event-definition = {
+  <event-options> {
+    <generate-event> {
+      <name> "every-5minutes";
+      <time-interval> "300";
+    }
+    <policy> {
+      <name> "periodic_collection";
+      <events> "every-5minutes";
+      <then> {
+        <event-script> {
+          <name> "TQ-pgcredit-chk.slax";
+        }
+      }
+    }
+  }
+}
+
+/******************************************************************************/
+/* accept output-type and threshold as command line parameters                */
+/******************************************************************************/
+var $arguments = {
+        <argument> {
+                <name> "output-type";
+                <description> "how to report results [trap | terminal | both]";
+        }
+        <argument> {
+                <name> "threshold";
+                <description> "value to check, default is 00000000";
+        }
+}
+/* set defaults for parameters */
+param $threshold = "00000000";
+param $output-type = "trap";
+
+
+/******************************************************************************/
+/* This is the main program logic.  We execute the pfe commands here and send */
+/* output to subroutines for processing                                       */
+/******************************************************************************/
+match / {
+<event-script-results> {
+  var $jnx = jcs:open();
+
+  var $pfes := { call get-pfe($jnx); };
+
+  for-each ($pfes/fpc) {
+    if ($output-type == "terminal" || $output-type == "both") {
+      expr jcs:output(fpc-module, " data");
+    }
+
+    var $cmd-rpe = <request-pfe-execute> {
+      <target> fpc-module;
+      <command> "bringup jspec read tqchip[0] register pgq min_pqt_free_cnt";
+      <command> "bringup jspec read tqchip[1] register pgq min_pqt_free_cnt";
+      <command> "bringup jspec read tqchip[2] register pgq min_pqt_free_cnt";
+      <command> "bringup jspec read tqchip[3] register pgq min_pqt_free_cnt";
+    };
+
+    /* send commands to the pfes*/
+    var $data = jcs:execute($jnx, $cmd-rpe);
+
+    /* Perform some data manipulation to split the output apart */
+    var $tmp-data1 = str:replace($data, "\n", "_NEWLINE_");
+    var $tmp-data2 = jcs:split("SENT:", $tmp-data1);
+
+    var $d1 = "SENT:" _ str:replace($tmp-data2[2], "_NEWLINE_", "\n");
+    var $d2 = "SENT:" _ str:replace($tmp-data2[3], "_NEWLINE_", "\n");
+    var $d3 = "SENT:" _ str:replace($tmp-data2[4], "_NEWLINE_", "\n");
+    var $d4 = "SENT:" _ str:replace($tmp-data2[5], "_NEWLINE_", "\n");
+
+    call process-data($raw=$d1, $label="tqchip-0", $jnx, $fpc=fpc-module, $chip=0);
+    call process-data($raw=$d2, $label="tqchip-1", $jnx, $fpc=fpc-module, $chip=1);
+    call process-data($raw=$d3, $label="tqchip-2", $jnx, $fpc=fpc-module, $chip=2);
+    call process-data($raw=$d4, $label="tqchip-3", $jnx, $fpc=fpc-module, $chip=3);
+  }
+  expr jcs:close( $jnx );
+}
+}
+
+/******************************************************************************/
+/* This template takes raw output from the PFE commands and processes it.     */
+/* Multiple PFE commands have similiar output so this can be used for all cmds*/
+/* with this basic format                                                     */
+/******************************************************************************/
+template process-data ($raw, $label, $jnx, $fpc, $chip) {
+
+  var $clean := { call check-for-error ($raw); };
+
+  if ($clean/error) {
+    expr jcs:output("   ERROR Sent: ", $clean/error/sent, " Message:",
+        $clean/error/message);
+  }
+  else {
+
+    var $data = $clean/data;
+    var $v1 = jcs:regex("tq.pgq.min_pqt_free_cnt[[:blank:]]+([[:xdigit:]]+)",
+       $data);
+
+    if ($output-type == "terminal" || $output-type == "both") {
+      call print-value($label, $value=$v1[2]);
+    }
+    if ($v1[2] == $threshold) {
+      if ($output-type == "trap" || $output-type == "both") {
+        expr jcs:syslog("user.error",$fpc, " TQCHIP ", $chip, ": PGQ fatal error, min_pqt_free_cnt:0x0");
+
+        var $event   = "ASIC-PAGE-CREDIT-ERROR";
+        var $message = $fpc _ "_TQCHIP_" _ $chip _ "_PGQ_fatal_error_min_pqt_free_cnt:0x0";
+
+        var $rpc = <request-snmp-generate-trap> {
+          <trap> "jnxEventTrap";
+            <variable-bindings> "jnxEventTrapDescr[0]='Event-Trap' , "
+              _ "jnxEventAvAttribute[1]='event' , "
+              _ "jnxEventAvValue[1]='" _ $event _ "' , "
+              _ "jnxEventAvAttribute[2]='message' , "
+              _ "jnxEventAvValue[1]='" _ $message _ "'";
+         }
+         var $res = jcs:invoke($rpc);
+      }
+    }
+  }
+}
+
+
+
+/******************************************************************************/
+/* This template outputs results formatted properly to the terminal           */
+/******************************************************************************/
+template print-value($label, $value) {
+  var $mod = { call set-mod($value, $level=$threshold); };
+  expr jcs:output( jcs:printf("   %-18s %8.8s%  %3s", $label, $value, $mod));
+}
+
+
+/******************************************************************************/
+/* This template builds a warning indicator if we are over the threshold      */
+/******************************************************************************/
+template set-mod($value, $level) {
+  if (number($value) > number($level)) {
+    expr "<<<";
+  }
+}
+
+
+
+/******************************************************************************/
+/* This template uses a show chassis hardware to determine the list of PFEs   */
+/* that should be targets for execution                                       */
+/******************************************************************************/
+template get-pfe ($jnx) {
+  var $cmd-hardware = <get-chassis-inventory>;
+  var $rslt-hardware = jcs:execute( $jnx, $cmd-hardware );
+
+  /* we will look for FPCs.  We need to massage the results to make the name */
+  /* friendly for use as a pfe target  */
+  for-each ($rslt-hardware/chassis/chassis-module[starts-with(name, "FPC")]) {
+    var $fpc-substr = jcs:split("[ ]", name);
+    var $fpc-num = $fpc-substr[2];
+    var $fpc-module = "fpc" _ $fpc-num;
+
+    /* return the list of pfes as an XML document */
+    <fpc> {
+      <fpc-module> $fpc-module;
+      <name> name;
+      <description> description;
+      <model-number> model-number;
+    }
+  }
+}
+
+
+/******************************************************************************/
+/* This template executes pfe commands and checks for errrors in the output   */
+/******************************************************************************/
+template execute-pfe-command ($jnx, $command) {
+
+  var $rslt-rpe = jcs:execute($jnx, $command);
+
+  /* grab the sent data from the return */
+  var $sent = jcs:regex("SENT: ([[:print:]]+)", $rslt-rpe);
+
+  /* check for an error message */
+  var $err  = jcs:regex("GOT: (Syntax error [[:print:]]+)", $rslt-rpe);
+
+  /* if we had an error send that back as an XML doc */
+  /* otherwise return the entire document retrieved  */
+  if (not(jcs:empty($err))) {
+    <error> {
+      <message> $err[2];
+      <sent> $sent[2];
+    };
+  }
+  else {
+    <data> $rslt-rpe;
+  }
+}
+
+template check-for-error ($raw) {
+
+  /* grab the sent data from the return */
+  var $sent = jcs:regex("SENT: ([[:print:]]+)", $raw);
+
+  /* check for an error message */
+  var $err  = jcs:regex("GOT: (Syntax error [[:print:]]+)", $raw);
+
+  /* if we had an error send that back as an XML doc */
+  /* otherwise return the entire document retrieved  */
+  if (not(jcs:empty($err))) {
+    <error> {
+      <message> $err[2];
+      <sent> $sent[2];
+    };
+  }
+  else {
+    <data> $raw;
+  }
+}
+
+
+/******************************************************************************/
+/* This template places data in the utility MIB                               */
+/******************************************************************************/
+template set-utility-mib ($jnx, $fpc, $label, $value) {
+
+  /* append the fpc and convert to lower case */
+  var $mib-full-name = $fpc _ "-" _ $label;
+  var $mib-final-name = { call to-lower( $string = $mib-full-name ); }
+
+  var $mib-value = round($value);
+
+  /* send the rpc command to the device */
+  var $cmd-set-mib = <request-snmp-utility-mib-set> {
+      <object-type> "integer";
+      <instance> $mib-final-name;
+            <object-value> $mib-value;
+        }
+        /* we should probably error check here and syslog if this will be ran as */
+        /* an event script */
+        var $rslt-set-mib = jcs:execute($jnx, $cmd-set-mib);
+}
+
+
+/******************************************************************************/
+/* This template converts strings to lower case                               */
+/******************************************************************************/
+template to-lower( $string ) {
+  expr translate( $string, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+      'abcdefghijklmnopqrstuvwxyz');
+}
