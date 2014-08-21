@@ -1,0 +1,25 @@
+Hashing Predictor Op Script Requirements
+Requirements by Lenny Giuliano <lenny@lenny.net>
+
+Verizon would like to be able to know which link in a LAG bundle or ECMP that a packet will be forwarded out of the router.  Trio now has that capability via PFE commands, but these commands are not very user friendly.  This op script would take as input the relevant details of a transit packet and output the outgoing interface of a LAG bundle or ECMP link.  It is expected that the operator will know all the relevant packet header details.
+
+The script could be executed on a single line where all the arguments are given or as an interactive prompted menu.  It should list all the candidate ECMP/LAG interfaces and then output the one interface that is chosen based on the hash.
+
+> op hash-predictor <iif> <source_ip> <dest_ip> <source_port> <dest_port> <protocol_id> <dscp>
+	Destination is known via interfaces ae0. ae.1 ge-1/0/0.0 ge-1/0/1.0
+	This packet will be forwarded out interface ge-2/0/0.0 which is a member of LAG bundle ae.1
+
+If no arguments are given, should enter an interactive set of prompts for the relevant packet details:
+
+> op hash-predictor
+	Incoming Interface? <iif>
+	Source IP address? <source_ip> 
+	Destoination IP Address? <dest_ip> 
+	Source Port? <source_port> 
+	Destination Port? <dest_port> 
+	Protocol ID? <protocol_id>
+	DSCP? <dscp>
+	Destination is known via interfaces ae0. ae.1 ge-1/0/0.0 ge-1/0/1.0
+	This packet will be forwarded out interface ge-2/0/0.0 which is a member of LAG bundle ae.1
+
+This script may be implemented in phases with IPv4 supported first followed by MPLS and IPv6 in that order of priority.
