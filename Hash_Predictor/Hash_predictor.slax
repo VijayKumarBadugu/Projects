@@ -1,0 +1,446 @@
+/*
+$Id$
+*/
+
+version 1.1;
+ns Junos = "http://xml.juniper.net/junos/*/junos";
+ns xnm = "http://xml.juniper.net/xnm/1.1/xnm";
+ns jcs = "http://xml.juniper.net/junos/commit-scripts/1.0";
+ns exsl extension = "http://exslt.org/common";
+ns bit extension = "http://xml.libslax.org/bit";
+ns str = "http://exslt.org/strings";
+
+import "../import/junos.xsl";
+
+/*
+ * Author        : Nadeem Mohammad
+ * Version       : 1.0
+ * Last Modified : September 30th, 2014
+ * Platform      : MX, Trinity.
+ * Release       : 12.x and above
+ *
+ * Description   : 
+ *
+ * =============================================================================
+ * Revision History
+ * -----------------------------------------------------------------------------
+ * 1.0: September 30th, 2014
+ *      - Initial Release
+ * 
+ *
+ * =============================================================================
+ *
+ * To set this up on your JUNOS device copy this script to the following folder:
+ * /var/db/scripts/op
+ *
+ * Make sure you name the script 'Hash_predictor' or change references in
+ * the script and JUNOS config to be whatever you named it.
+ *
+ */
+
+var $arguments = {
+        <argument> {
+                <name> "src-addr";
+                <description> "src ip address";
+        }
+        <argument> {
+                <name> "dst-addr";
+                <description> "dst ip address";
+        }
+        <argument> {
+                <name> "src-port";
+                <description> "src udp port";
+        }
+        <argument> {
+                <name> "dst-port";
+                <description> "dst udp port";
+        }
+        <argument> {
+                <name> "interface";
+                <description> "ingress interface";
+        }
+}
+
+param $src-addr = 0;
+param $dst-addr = 0;
+param $src-port = 0;
+param $dst-port = 0;
+param $interface = 0;
+
+match / {
+
+  <op-script-results> {
+
+    var $src-result = jcs:split("\\.", $src-addr);
+
+    var $src-dec-octet1 = $src-result[1];
+    var $src-dec-octet2 = $src-result[2];
+    var $src-dec-octet3 = $src-result[3];
+    var $src-dec-octet4 = $src-result[4];
+    
+    var $srcword1 := { call get_word($dec-octet1 = $src-dec-octet1,
+				     $dec-octet2 = $src-dec-octet2); };
+/*    <output> "src word1 = " _ $srcword1;*/
+
+    var $srcword2 := { call get_word($dec-octet1 = $src-dec-octet3,
+				     $dec-octet2 = $src-dec-octet4); };
+/*    <output> "src word2 = " _ $srcword2;*/
+
+    /* get the destination ip hex words */
+    var $dst-result = jcs:split("\\.", $dst-addr);
+
+    var $dst-dec-octet1 = $dst-result[1];
+    var $dst-dec-octet2 = $dst-result[2];
+    var $dst-dec-octet3 = $dst-result[3];
+    var $dst-dec-octet4 = $dst-result[4];
+    
+    var $dstword1 := { call get_word($dec-octet1 = $dst-dec-octet1,
+				     $dec-octet2 = $dst-dec-octet2); };
+/*    <output> "dst word1 = " _ $dstword1;*/
+
+    var $dstword2 := { call get_word($dec-octet1 = $dst-dec-octet3,
+				     $dec-octet2 = $dst-dec-octet4); };
+/*    <output> "dst word2 = " _ $dstword2;*/
+  
+    /* get the ip checksum */
+    var $ip-checksum := { call get_ip_checksum($srcword1, $srcword2,
+						$dstword1, $dstword2); };
+/*    <output> "ip checksum = " _ $ip-checksum;*/
+
+    /* get the src udp port in hex */
+    var $src-udp-port-hex := { call get_udp_port_in_hex($port = $src-port); };
+/*    <output> "src udp port = " _ $src-udp-port-hex;*/
+
+    /* get the dst udp port in hex */
+    var $dst-udp-port-hex := { call get_udp_port_in_hex($port = $dst-port); };
+/*    <output> "dst udp port = " _ $dst-udp-port-hex;*/
+
+    /* get the udp checksum */
+    var $udp-check-sum := { call get_udp_checksum($srcword1, $srcword2,
+						  $dstword1, $dstword2,
+			                          $src-udp-port-hex,
+                                                  $dst-udp-port-hex); };
+/*    <output> "udp checksum = " _ $udp-check-sum;*/
+
+
+    /* get the oif */
+    var $oif := { call get_oif($srcword1, $srcword2,
+			       $dstword1, $dstword2,
+			       $src-udp-port-hex,
+                               $dst-udp-port-hex,
+			       $ip-checksum, $interface); };
+/*    call get_oif($srcword1, $srcword2,
+			       $dstword1, $dstword2,
+			       $src-udp-port-hex,
+                               $dst-udp-port-hex,
+			       $ip-checksum, $interface);*/
+
+   /* Display the available nexthops for this destination */
+    var $route-rpc = <get-route-information> {
+      <destination> $dst-addr;
+    }
+
+    var $route-string = jcs:invoke($route-rpc);
+
+    for-each ($route-string//nh) {
+	   var $available-nh = ./via;
+           expr jcs:output("available next-hop " _ $available-nh);
+    }
+
+    /* now display the selected nexthop */
+    <output> " ";
+    <output> "oif = " _ $oif;
+  }
+}
+
+/* get the outgoing interface */
+template get_oif($srcword1, $srcword2, $dstword1, $dstword2,
+		 $src-udp-port-hex, $dst-udp-port-hex,
+		 $ip-checksum, $interface)
+{
+
+   /* Get the FPC */
+   var $sub-str = jcs:split( "-", $interface);
+   var $fpc-str = jcs:split("/", $sub-str[2]);
+   var $fpc = "fpc" _ $fpc-str[1];
+/*   <output> "fpc = " _ $fpc;*/
+
+   /* Build the packet to send out */
+   var $packet = "4500002c03ec00004011" _ $ip-checksum _ $srcword1 _ $srcword2 _ $dstword1 _ $dstword2 _ $src-udp-port-hex _ $dst-udp-port-hex _ "0070000032ff00600000002a0001000000000000";
+
+/*   <output> "packet = " _ $packet;*/
+
+    expr jcs:output("Building IP Packet....\n");
+
+    /* Build the rpc to send the packet */
+    call send_ip_packet($fpc, $interface, $packet);
+
+    /* now build the rpc to get the ukern handle */
+     var $ukern-rpc = <request-pfe-execute> {
+      <target> $fpc;
+      <command> "show ukern_trace handles";
+    }
+
+    var $ukern-string = jcs:invoke($ukern-rpc);
+
+    var $ukern-handle := { call get_ukern_handle($ukern-string); };
+/*    <output> "ukern handle = " _ $ukern-handle;*/
+
+    /* Need to clear the buffer before getting the oif */
+    call clear_ukern_buffer($fpc, $ukern-handle);
+
+    expr jcs:output("Sending IP Packet....\n");
+
+    /* After clearing the buffer send the packet again */
+    call send_ip_packet($fpc, $interface, $packet);
+
+    /* using the ukern-handle now get the oif index */
+     var $oif-index-rpc = <request-pfe-execute> {
+      <target> $fpc;
+      <command> "show ukern_trace " _ $ukern-handle;
+    }
+
+    var $oif-index-string = jcs:invoke($oif-index-rpc);
+    var $oif-index-line := { call get_oif_index($oif-index-string); };
+    var $oif-index-line-sub-string = jcs:split(",", $oif-index-line);
+    var $oif-index-sub-string = jcs:split(":", $oif-index-line-sub-string[1]);
+    var $oif-index = $oif-index-sub-string[2];
+/*    <output> "oif index = " _ $oif-index;*/
+
+    /* using the oif-index now get the oif name */
+    var $oif-name-rpc = <request-pfe-execute> {
+      <target> $fpc;
+      <command> "show ifl " _ $oif-index;
+    }
+
+    var $oif-name-string = jcs:invoke($oif-name-rpc);
+    var $oif-name := { call get_oif_name($oif-name-string); };
+/*    <output> "oif = " _ $oif-name;*/
+    copy-of $oif-name;
+}
+
+template send_ip_packet($fpc, $interface, $packet)
+{
+   var $packet-rpc = <request-pfe-execute> {
+      <target> $fpc;
+      <command> "test jnh inject-lb-test " _ $interface _ " inet " _ $packet;
+    }
+
+    var $packet-string = jcs:invoke($packet-rpc);
+}
+
+/* clears the ukern buffer */
+template clear_ukern_buffer($fpc, $ukern-handle)
+{
+     var $clear-rpc = <request-pfe-execute> {
+      <target> $fpc;
+      <command> "clear ukern_trace " _ $ukern-handle;
+    }
+    var $clear-string = jcs:invoke($clear-rpc);
+}
+ 
+/* get the oif-name from supplied output string*/
+template get_oif_name($oif-name-string)
+{
+    var $oif-name-lines = jcs:break_lines($oif-name-string);
+
+    for-each ($oif-name-lines) {
+        if (contains(., "Logical interface")) {
+            var $v1 = jcs:split("[[:blank:]]", .);
+            copy-of $v1[4];
+        }
+    }
+}
+
+/* get the oif-index from supplied output string*/
+template get_oif_index($oif-index-string)
+{
+    var $oif-index-lines = jcs:break_lines($oif-index-string);
+
+    for-each ($oif-index-lines) {
+        if (contains(., "OIF")) {
+            var $v1 = jcs:split("[[:blank:]]", .);
+            copy-of $v1[12];
+        }
+    }
+}  
+
+/* get the ukern handle from supplied output string*/
+template get_ukern_handle($ukern-string)
+{
+    var $ukern-lines = jcs:break_lines($ukern-string);
+
+    for-each ($ukern-lines) {
+        if (contains(., "JNH_LBTEST_RX")) {
+            var $v1 = jcs:split("[[:blank:]]", .);
+            copy-of $v1[2];
+        }
+    }
+}
+
+/* get the udp port numbers */
+template get_udp_port_in_hex($port)
+{
+   var $bit-port = bit:from-int(number($port), 16);
+   var $hex-port = bit:to-hex($bit-port);
+   var $port-substr = jcs:split("x", $hex-port);
+   var $port01 = $port-substr[2];
+   var $hex-port-length = string-length($port01);
+/*   <output> "port = " _ $port01 _ " str len = " _ $hex-port-length;*/
+   if ($hex-port-length == 3 ) {
+     var $hex-port-octet1 = "0" _ $port01;
+     copy-of $hex-port-octet1;
+   } else {
+     var $hex-port-octet2 = $port01;
+     copy-of $hex-port-octet2;
+   }
+}
+
+
+/* get the word in hex from the src or dst ip octets */
+template get_word($dec-octet1, $dec-octet2)
+{
+    var $bit-octet1 = bit:from-int(number($dec-octet1), 16);
+    var $hex-octet1 = bit:to-hex($bit-octet1);
+
+    var $octet1 := { call get_octet($hex-octet = $hex-octet1); };
+
+    var $bit-octet2 = bit:from-int(number($dec-octet2), 16);
+    var $hex-octet2 = bit:to-hex($bit-octet2);
+
+    var $octet2 := { call get_octet($hex-octet = $hex-octet2); };
+
+/*    var $word = "0x" _ $octet1 _ $octet2;*/
+    var $word = $octet1 _ $octet2;
+    copy-of $word;
+}
+
+
+template get_octet($hex-octet)
+{
+    var $octet-length = string-length($hex-octet);
+
+    if ($octet-length == 3) {
+       var $substr = jcs:split("x", $hex-octet);
+       var $octet01 = $substr[1] _ $substr[2];
+       copy-of $octet01;
+    }
+    else 
+    {
+       var $substr2 = jcs:split("x", $hex-octet);
+       var $octet02 = $substr2[2];
+       copy-of $octet02;
+    }
+}
+
+
+template get_ip_checksum($srcword1, $srcword2, $dstword1, $dstword2)
+{
+    var $bitword1 = bit:from-hex('0x4500');
+    var $decword1 = bit:to-int($bitword1);
+/*    <output> "dec word1 = " _ $decword1;*/
+
+    var $bitword2 = bit:from-hex('0x002c');
+    var $decword2 = bit:to-int($bitword2);
+/*    <output> "dec word2 = " _ $decword2;*/
+
+    var $bitword3 = bit:from-hex('0x03ec');
+    var $decword3 = bit:to-int($bitword3);
+/*    <output> "dec word3 = " _ $decword3;*/
+
+    var $bitword4 = bit:from-hex('0x0000');
+    var $decword4 = bit:to-int($bitword4);
+/*    <output> "dec word4 = " _ $decword4;*/
+
+    var $bitword5 = bit:from-hex('0x4011');
+    var $decword5 = bit:to-int($bitword5);
+/*    <output> "dec word5 = " _ $decword5;*/
+
+    var $bitword6 = bit:from-hex($srcword1);
+    var $decword6 = bit:to-int($bitword6);
+/*    <output> "dec word6 = " _ $decword6;*/
+
+    var $bitword7 = bit:from-hex($srcword2);
+    var $decword7 = bit:to-int($bitword7);
+/*    <output> "dec word7 = " _ $decword7;*/
+
+    var $bitword8 = bit:from-hex($dstword1);
+    var $decword8 = bit:to-int($bitword8);
+/*    <output> "dec word8 = " _ $decword8;*/
+
+    var $bitword9 = bit:from-hex($dstword2);
+    var $decword9 = bit:to-int($bitword9);
+/*    <output> "dec word9 = " _ $decword9;*/
+
+    /* + 0073 + 0000 + 4000 + 4011 + c0a8 + 0001 + c0a8 + 00c7*/
+
+   var $sum = $decword1 + $decword2 + $decword3 + $decword4 + $decword5 + $decword6 + $decword7 + $decword8 + $decword9;
+
+/*   <output> "sum = " _ $sum;*/
+
+    var $val = $sum mod 65536;
+    var $carry = $sum div 65536;
+
+    var $bits = bit:from-int($val + $carry, 16);
+    var $bitchsum = bit:not($bits);
+    var $hexchsum = bit:to-hex($bitchsum);
+
+    var $str-chsum = string($hexchsum);
+    var $chsum-sub = jcs:split("x", $str-chsum);
+
+    copy-of $chsum-sub[2];
+}
+
+
+template get_udp_checksum($srcword1, $srcword2, $dstword1, $dstword2,
+			  $src-udp-port-hex, $dst-udp-port-hex)
+{
+    var $bitword1 = bit:from-hex($srcword1);
+    var $decword1 = bit:to-int($bitword1);
+/*    <output> "dec word1 = " _ $decword1;*/
+
+    var $bitword2 = bit:from-hex($srcword2);
+    var $decword2 = bit:to-int($bitword2);
+/*    <output> "dec word2 = " _ $decword2;*/
+
+    var $bitword3 = bit:from-hex($dstword1);
+    var $decword3 = bit:to-int($bitword3);
+/*    <output> "dec word3 = " _ $decword3;*/
+
+    var $bitword4 = bit:from-hex($dstword2);
+    var $decword4 = bit:to-int($bitword4);
+/*    <output> "dec word4 = " _ $decword4;*/
+
+    var $bitword5 = bit:from-hex('0x0011', 16);
+    var $decword5 = bit:to-int($bitword5);
+/*    <output> "dec word5 = " _ $decword5;*/
+
+    var $bitword6 = bit:from-hex('0x0070', 16);
+    var $decword6 = bit:to-int($bitword6);
+/*    <output> "dec word6 = " _ $decword6;*/
+
+    var $bitword7 = bit:from-hex($src-udp-port-hex, 16);
+    var $decword7 = bit:to-int($bitword7);
+/*    <output> "dec word7 = " _ $decword7;*/
+
+    var $bitword8 = bit:from-hex($dst-udp-port-hex, 16);
+    var $decword8 = bit:to-int($bitword8);
+/*    <output> "dec word8 = " _ $decword8;*/
+
+    var $bitword9 = bit:from-hex('0x0070', 16);
+    var $decword9 = bit:to-int($bitword9);
+/*    <output> "dec word9 = " _ $decword9;*/
+
+    var $sum = $decword1 + $decword2 + $decword3 + $decword4 + $decword5 + $decword6 + $decword7 + $decword8 + $decword9;
+
+   <output> "sum = " _ $sum;
+
+    var $val = $sum mod 65536;
+    var $carry = $sum div 65536;
+
+    var $bits = bit:from-int($val + $carry, 16);
+    var $bitchsum = bit:not($bits);
+    var $hexchsum = bit:to-hex($bitchsum);
+
+    copy-of $hexchsum;
+}

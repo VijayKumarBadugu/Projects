@@ -1,0 +1,59 @@
+   Author        : Nadeem Mohammad
+                   nmohammad@juniper.net
+   Date          : 09/30/2014.
+
+   Description   : This op script takes following as input arguments
+		 1. src ip address
+		 2. Dst ip address
+		 3. src udp port
+		 4. Dst udp port
+		 5. ingress interface in vlan format e.g. xe-1/1/1.0
+
+		Based on the above input, this op script will calculate ip and
+		udp checksum and formulate an IP over UDP packet to be sent
+		out to the dst address. 
+
+		This op script uses PFE functionality which enables the script
+		to send this packet across the PFE engine and predict the 
+		outgoing interface. Packet doesnt egress the router but just
+		gets consumed within the PFE engine. purpose of this script
+		is to, given an ingress interface, src and dst fields, it will
+		predict which outgoing interface packet will take go egress the
+		box. 
+
+		script will first list all the possible nexthops for this 
+		destination address and then list the outgoing interface. 
+
+		E.g outgoing OIF could be a member link of an aggregate ae0.
+		Script will list the available nexthop as "ae0.0" and then
+		display one of the member links of this aggregate which this
+		packet will take to egress the box e.g. xe-1/1/2.0
+
+		User is responsible for entering correct fields for the input.
+
+  Note: This script currently only works on MX and trinity chipset.
+
+  CLI Commands Used:
+
+  This script uses a series of PFE commands as follows:
+
+  test jnh inject-lb-test "ingress interface" inet "packet"
+  
+  clear ukern_trace "handle"
+
+  show ukern_trace "handle"
+
+  show ifl "if index"
+
+  Instructions:
+
+  To set this up on your JUNOS device copy this script to the following folder:
+  /var/db/scripts/op/
+
+  Then configure JUNOS with the following:
+
+  'set system script op file Hash_predictor.slax'
+
+  Caveat: Currently only works for IPV4 packet. user is responsible for giving correct
+	  ipv4 addresses. script doesnt validate provided input. wrong input such as
+	  ipv6 addresses will not work and the results will be unpredictable.
