@@ -2,7 +2,11 @@
                    nmohammad@juniper.net
    Date          : 09/30/2014.
 
-   Description   : This op script takes following as input arguments
+   Description   : The purpose of this op script is to determine which 
+                 interface in a LAG bundle or ECMP will be used to forward 
+                 a given packet.
+ 
+	         This op script takes following as input arguments
 		 1. src ip address
 		 2. Dst ip address
 		 3. src udp port
@@ -57,3 +61,16 @@
   Caveat: Currently only works for IPV4 packet. user is responsible for giving correct
 	  ipv4 addresses. script doesnt validate provided input. wrong input such as
 	  ipv6 addresses will not work and the results will be unpredictable.
+
+  Sample Output from the Script:
+
+  >op Hash_predictor interface ge-1/0/5.0 dst-addr 2.2.2.2 dst-port 1234 src-port 1235 src-addr 4.4.4.4
+
+  Building IP Packet....
+  This may take a moment....
+  Sending IP Packet....
+  Candidate next-hop ae0.0
+  Candidate next-hop ae1.0
+  Candidate next-hop ge-4/0/4.0
+  Candidate next-hop ge-4/0/5.0
+  Selected oif = ge-4/0/3.0

@@ -71,6 +71,18 @@ match / {
 
   <op-script-results> {
 
+  if ($src-addr == 0 ) {
+    expr jcs:output("Please enter IP src address \n");
+  } else if ($dst-addr == 0) {
+    expr jcs:output("Please enter IP dst address \n");
+  } else if ($src-port == 0) {
+    expr jcs:output("Please enter valid src udp port number \n");
+  } else if ($dst-port == 0) {
+    expr jcs:output("Please enter valid dst udp port number \n");
+  }
+  else 
+  {
+
     var $src-result = jcs:split("\\.", $src-addr);
 
     var $src-dec-octet1 = $src-result[1];
@@ -144,12 +156,13 @@ match / {
 
     for-each ($route-string//nh) {
 	   var $available-nh = ./via;
-           expr jcs:output("available next-hop " _ $available-nh);
+           expr jcs:output("Candidate next-hop " _ $available-nh);
     }
 
     /* now display the selected nexthop */
     <output> " ";
-    <output> "oif = " _ $oif;
+    <output> "Selected oif = " _ $oif;
+   }
   }
 }
 
@@ -174,6 +187,8 @@ template get_oif($srcword1, $srcword2, $dstword1, $dstword2,
 
     /* Build the rpc to send the packet */
     call send_ip_packet($fpc, $interface, $packet);
+
+    expr jcs:output("This may take a moment....\n");
 
     /* now build the rpc to get the ukern handle */
      var $ukern-rpc = <request-pfe-execute> {
