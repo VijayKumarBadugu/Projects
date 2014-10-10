@@ -71,6 +71,8 @@ match / {
 
   <op-script-results> {
 
+  var $intf-status := { call get_intf_status($interface); };
+
   if ($src-addr == 0 ) {
     expr jcs:output("Please enter IP src address \n");
   } else if ($dst-addr == 0) {
@@ -79,6 +81,8 @@ match / {
     expr jcs:output("Please enter valid src udp port number \n");
   } else if ($dst-port == 0) {
     expr jcs:output("Please enter valid dst udp port number \n");
+  } else if ($intf-status == 0 ) {
+    expr jcs:output("Please enter interface in vlan format e.g xe-1/1/1.0 \n");
   }
   else 
   {
@@ -163,6 +167,18 @@ match / {
     <output> " ";
     <output> "Selected oif = " _ $oif;
    }
+  }
+}
+
+template get_intf_status($interface)
+{
+  var $intf-str = jcs:split('[.]', $interface);
+  var $vlan-notation = $intf-str[2];
+  if ($vlan-notation >= 0) {
+    /* do nothing */
+  } else {
+    var $stat = 0;
+    copy-of $stat;
   }
 }
 
