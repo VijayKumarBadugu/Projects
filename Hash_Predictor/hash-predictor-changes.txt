@@ -1,0 +1,20 @@
+Hash predictor comments:
+
+-Add error checks, display error information:	
+	-make sure the iif is configured, and specified with ifl (ex, ge-0/0/0.0 not just ge-0/0/0)
+	-make sure all parameters are specified- allows you to hit enter without any parameters- should require all parameters
+	-make sure all values are properly formatted- currently allows you to add letters or incomplete IP addresses
+	-make sure a route exists for the destination address
+
+-Can the parameters get autocompleted with "tab"?
+	-currently only autocompletes if you type the first letter.
+-Rename "available next-hop" to "Candidate Next-Hop"
+-Rename "oif" to "Selected Next-Hop"
+
+-Progress indicator- can we add a "."' each second to the end of the line while "Building/Sending packet" to indicate progress so the user doesn't think it's hung?
+	-if not, add "this may take a moment" to the output
+
+-Add a "verbose" option, which would display the ugly pfe commands and output along the way.
+
+-Add following at the beginning of the Readme:
+"The purpose of this op script is to determine which interface in a LAG bundle or ECMP will be used to forward a given packet."
