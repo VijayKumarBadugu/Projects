@@ -1,0 +1,45 @@
+version 1.0;
+ns junos = "http://xml.juniper.net/junos/*/junos";
+ns xnm = "http://xml.juniper.net/xnm/1.1/xnm";
+ns jcs = "http://xml.juniper.net/junos/commit-scripts/1.0";
+import "../import/junos.xsl";
+match configuration {
+	
+	
+        
+	for-each(interfaces/interface)
+	{
+		if(not( starts-with(name,"fxp") || starts-with(name,"lo") || starts-with(name,"em")))
+		{
+		
+			if((not(disable))&&(unit))
+			{
+					
+				if(not(mtu))
+				{
+					
+					var $No_Config_Error = " MTU is not configured for interface " _ name;
+					expr jcs:syslog("user.error",$No_Config_Error);					
+	                		<xnm:warning> {
+						<message> " MTU is not configured for interface " _ name ;
+						}
+				}
+				else
+				{
+					if(mtu<2000)
+					{
+						var $Less_Config_Error = " MTU is less than 2000 for interface " _ name _ " MTU is " _ mtu;
+						expr jcs:syslog("user.error",$Less_Config_Error);
+	                			<xnm:warning> {
+						<message> " MTU is less than 2000 for interface " _ name _ " MTU is " _ mtu;
+						}
+					}
+
+				}
+			}
+			
+		}
+	}
+		
+		
+}
