@@ -9,18 +9,18 @@ Description   	 : 	The purpose of this commit script is to make sure MTU is conf
 			The script determines the liveliness of the interface by checking for "unit" and "disable" on the interfaces. 
 			If the interface configuration doesn't contain "disable" and "unit" is present the script considers that 
 			interface as "live". The script ignores fxp,em,lo interfaces. The script also works in a scenario where 
-			an interface inherits mtu from apply-group configuration.
+			an interface inherits "MTU" from apply-group configuration.
 
 Pseudo Code    	 : 	1. 	Ignore the interfaces starting with "fxp", "em", "lo".
 
 		   	2. 	Consider the interfaces which have "unit" in configuration and doesn't have "disable" in the 
 				configuration.
 
-		   	3. 	Check for "mtu" in the interface configuration. If "mtu" is not present the script throws a 
-				warning saying "mtu is not configured". This message is logged in syslog.
+		   	3. 	Check for "MTU" in the interface configuration. If "MTU" is not present the script throws a 
+				warning saying "MTU is not configured". This message is logged in syslog.
 		
-		   	4. 	If "mtu" is present the script checks whether configured "mtu" is less than 2000 .If "mtu" is 
-				less than 2000 the script throws a warning saying "mtu is less than 2000". This message is logged in
+		   	4. 	If "MTU" is present the script checks whether configured "MTU" is less than 2000 .If "MTU" is 
+				less than 2000 the script throws a warning saying "MTU is less than 2000". This message is logged in
 				syslog.
 
 CLI Commands Used	:	No cli commands are used in the script. The script just reads the configuration.

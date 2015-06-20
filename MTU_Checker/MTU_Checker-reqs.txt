@@ -24,4 +24,6 @@ Here is the required functionality of commit script expected
 		b) MTU configured is less than 2000.
 
 4)	The script should also work in the scenario where the interface inherits "MTU" from apply-groups.
+
+5)	The script should log reason for commit failure in Syslog.
 		

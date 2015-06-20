@@ -3,35 +3,65 @@ ns junos = "http://xml.juniper.net/junos/*/junos";
 ns xnm = "http://xml.juniper.net/xnm/1.1/xnm";
 ns jcs = "http://xml.juniper.net/junos/commit-scripts/1.0";
 import "../import/junos.xsl";
+
+/*
+ * Author        : Vijay Kumar Badugu
+ * Version       : 1.0
+ * Last Modified : June 18, 2015
+ * Description   : The purpose of this commit script is to make sure MTU is configured on "Live" interfaces.
+ *		   The script is invoked when a "commit" is issued on the JUNOS device in configuration mode.
+ *
+ *==========================================================================================================
+ * To set this script up on your JUNOS device copy this script to the following folder:
+ * /var/run/scripts/commit
+ *			
+ * Then configure JUNOS with the following :
+ * set system scripts commit file MTU-checker.slax
+ *
+ */
+
 match configuration {
 	
 	
         
 	for-each(interfaces/interface)
 	{
-		if(not( starts-with(name,"fxp") || starts-with(name,"lo") || starts-with(name,"em")))
+		/* Ignore the interfaces starting with "fxp", "em", "lo".*/
+
+		if(not( starts-with(name,"fxp") || starts-with(name,"lo") || starts-with(name,"em"))) 
 		{
 		
+			/* Consider the interfaces which have "unit" in configuration and doesn't have "disable" in the configuration. */
 			if((not(disable))&&(unit))
 			{
-					
+				/*Check for "MTU" in the interface configuration. If "MTU" is not present the script throws a 
+				warning saying "MTU is not configured". This message is logged in syslog.*/
+	
 				if(not(mtu))
 				{
 					
 					var $No_Config_Error = " MTU is not configured for interface " _ name;
-					expr jcs:syslog("user.error",$No_Config_Error);					
+
+					expr jcs:syslog("user.error",$No_Config_Error);	
+				
 	                		<xnm:warning> {
-						<message> " MTU is not configured for interface " _ name ;
+						<message>  $No_Config_Error;
 						}
 				}
 				else
 				{
+					/*If "MTU" is present the script checks whether configured "MTU" is less than 2000 .If "MTU" is 
+				less than 2000 the script throws a warning saying "MTU is less than 2000". This message is logged in
+				syslog.*/
+
 					if(mtu<2000)
 					{
 						var $Less_Config_Error = " MTU is less than 2000 for interface " _ name _ " MTU is " _ mtu;
+
 						expr jcs:syslog("user.error",$Less_Config_Error);
+
 	                			<xnm:warning> {
-						<message> " MTU is less than 2000 for interface " _ name _ " MTU is " _ mtu;
+						<message> $Less_Config_Error;
 						}
 					}
 
