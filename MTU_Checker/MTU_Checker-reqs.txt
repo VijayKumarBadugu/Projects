@@ -1,1 +1,27 @@
-Reqs here
+MTU_Checker Commit Script Requirements
+
+Requested by Lenny Giuliano <lenny@juniper.net>
+
+High level Overview
+
+Verizon wants to make sure MTU is configured on all "live" interfaces. They need a script which
+does commit failure of the configuration when MTU is not configured. 
+
+Functional Details
+
+Here is the required functionality of commit script expected
+
+1) 	The script should check on all "Live" interfaces.All the interfaces which contain "unit" 
+	and doesn't contain "disable" in the configuration are considered "Live".
+
+2) 	The script should ignore the following interfaces
+		a) fxp 	—	Management and internal Ethernet interfaces.
+		b) em	—	Management and internal Ethernet interfaces.
+		c) lo	—	Loopback interface.
+
+3)	The script should fail the commit of the configuration in following two cases.
+		a) MTU not at all configured.
+		b) MTU configured is less than 2000.
+
+4)	The script should also work in the scenario where the interface inherits "MTU" from apply-groups.
+		
