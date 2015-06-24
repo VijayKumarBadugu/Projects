@@ -22,6 +22,8 @@ Pseudo Code    	 : 	1. 	Ignore the interfaces starting with "fxp", "em", "lo", "
 		   	4. 	If "MTU" is present the script checks whether configured "MTU" is less than 2000 .If "MTU" is 
 				less than 2000 the script throws a warning saying "MTU is less than 2000". This message is logged in
 				syslog.
+			
+			5. 	The facility of the syslog message is "user" and severity level is "error".
 
 CLI Commands Used	:	No cli commands are used in the script. The script just reads the configuration.
 	
@@ -30,6 +32,8 @@ Instructions	 	:	To set this script up on your JUNOS device copy this script
 			
 				Then configure JUNOS with the following :
 				set system scripts commit file MTU-checker.slax
+
+				The syslog messages can be viewed in /var/log/messages.
 				
 				
 			
