@@ -26,9 +26,9 @@ match configuration {
         
 	for-each(interfaces/interface)
 	{
-		/* Ignore the interfaces starting with "fxp", "em", "lo".*/
+		/* Ignore the interfaces starting with "fxp", "em", "lo" "ats" .*/
 
-		if(not( starts-with(name,"fxp") || starts-with(name,"lo") || starts-with(name,"em"))) 
+		if(not( starts-with(name,"fxp") || starts-with(name,"lo") || starts-with(name,"em") || starts-with(name,"ats"))) 
 		{
 		
 			/* Consider the interfaces which have "unit" in configuration and doesn't have "disable" in the configuration. */
