@@ -17,7 +17,8 @@ Here is the expected functionality of commit script :
 2) 	The script should ignore the following interfaces
 		a) fxp 	—	Management and internal Ethernet interfaces.
 		b) em	—	Management and internal Ethernet interfaces.
-		c) lo	—	Loopback interface.
+		c) lo	—	Loopback interfaces.
+		d) ats	-	Aggregated Tethered Services interfaces.
 
 3)	The script should fail the commit of the configuration in following two cases.
 		a) MTU not at all configured.

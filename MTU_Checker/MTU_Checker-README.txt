@@ -11,7 +11,7 @@ Description   	 : 	The purpose of this commit script is to make sure MTU is conf
 			interface as "live". The script ignores fxp,em,lo interfaces. The script also works in a scenario where 
 			an interface inherits "MTU" from apply-group configuration.
 
-Pseudo Code    	 : 	1. 	Ignore the interfaces starting with "fxp", "em", "lo".
+Pseudo Code    	 : 	1. 	Ignore the interfaces starting with "fxp", "em", "lo", "ats".
 
 		   	2. 	Consider the interfaces which have "unit" in configuration and doesn't have "disable" in the 
 				configuration.
