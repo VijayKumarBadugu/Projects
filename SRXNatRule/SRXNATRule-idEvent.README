@@ -1,6 +1,0 @@
-This event script gets triggered from a commit and then 
-checks for an invalid rule-id on SRX5800 or branch boxes it 
-sleeps for 60 seconds first and then excutes pfe commands to 
-find the invalid rule-id. defination of invalid rule-id is an 
-id that is greater than the max rule-id value. if an invalid 
-rule-id is detected, script logs a pfe error to the syslog.
