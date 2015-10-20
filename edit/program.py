@@ -1,0 +1,25 @@
+def recursive(A,B):
+	lenA=len(A)
+	lenB=len(B)
+	if lenA==0 and lenB==0:
+		return 0
+	else:
+		if lenA==0:
+			return lenB
+		if lenB==0:
+			return lenA
+	
+	if(A[lenA-1]==B[lenB-1]):
+		return recursive(A[0:lenA-1],B[0:lenB-1])
+		 
+	else:
+		Temp1=recursive(A[0:lenA-1],B[0:lenB-1])
+		Temp2=recursive(A[0:lenA],B[0:lenB-1])
+		Temp3=recursive(A[0:lenA-1],B[0:lenB])
+		#print "vijay",min(Temp1,Temp2,Temp3)
+		return 1+min(Temp1,Temp2,Temp3)
+	
+A="sunday"
+B="saturday"
+
+print recursive(A,B)
