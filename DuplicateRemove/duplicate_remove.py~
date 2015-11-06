@@ -1,7 +1,7 @@
 # don't use any library functions
 # don't use any temp data structures
 # remove the duplicates in the in_arr 
-in_arr = [2,2,2,2,2,2,2]
+in_arr = [2,2,3,4]
 #in_arr = [1,2,3,4,5,33]
 
 
