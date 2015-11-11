@@ -1,6 +1,10 @@
+# printing permutations of string
 def permutations(string,i,j):
-	print string
-	for k in range(i+1,j+1):
+	if i==j:
+		print string
+		return
+
+	for k in range(i,j+1):
 		
 		m		=	string[i]
 		string[i]	=	string[k]
@@ -15,4 +19,4 @@ def permutations(string,i,j):
 	
 string	= "abc"
 
-permutations(string,0,len(string)-1)
+permutations(list(string),0,len(string)-1)
