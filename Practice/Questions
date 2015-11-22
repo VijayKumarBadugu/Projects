@@ -1,0 +1,46 @@
+B. Arrays/Strings:
+
+a. Determine if string has all unique characters. Next, don't use any additional data structures.
+
+b. Reverse a string.
+
+c. Given two strings, determine if one is a permutation of the other.
+
+d. Reverse words in a string.
+
+C. Linked Lists:
+
+a. Remove duplicates from an unsorted linked lists. Then, don't use any temporary buffers.
+
+b. Find the kth to last element of a linked list.
+
+c. Determine if linked list is circular.
+
+d. Reverse a linked list.
+
+D. Stacks/Queue
+
+a. Design a stack that keeps track of min/max element. O(1) time operations for maintaining the min/max.
+
+b. Solve Tower of Hanoi using Stacks.
+
+c. Implement a Queue using two Stacks.
+
+E. Trees/Graphs:
+
+a. Find if there's a route between two nodes.         
+
+b. Find if a binary tree is balanced.           
+
+c. Perform a pre-order, in-order or post-order traversal of a Tree.
+
+d. Return the height of a tree.
+
+F. Additional Example Questions (analyze the runtime complexity of your solution for each)
+
+a. Merge two sorted linked list of integers.
+
+b. Write a function that takes an integer N as an argument and prints all of the prime numbers between 1 and N (inclusive) to stdout.
+
+c. Design a dialer for a feature phone.
+
