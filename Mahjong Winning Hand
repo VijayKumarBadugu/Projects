@@ -1,0 +1,46 @@
+print "Hello World!"
+Hand = [1,1,1,2,2,2,3,3,3,4,4,4,5,7]
+
+def WinningHand(Hand):
+    hashmap = {}
+    for i in Hand:
+        if i not in hashmap.keys():
+            hashmap[i] = 1
+        else:
+            hashmap[i] = hashmap[i] + 1
+    return HandPower(hashmap,0,0)
+
+def HandPower(hashmap, s, p):
+    if p == 1 and s ==4:
+        return True
+    print(hashmap)
+    for i in hashmap.keys():
+        if hashmap[i] >= 3:
+            hashmap[i] -= 3
+            
+            if HandPower(hashmap, s+1, p) is True:
+                return True
+            hashmap[i] += 3
+        if p < 1:
+            if hashmap[i] >= 2:
+                hashmap[i] -= 2
+                
+                if HandPower(hashmap, s, p+1) is True:
+                    return True
+                hashmap[i] += 2
+    for i in range(1,8):
+        keys = hashmap.keys()
+        
+        if i in keys and hashmap[i] > 0 and (i+1) in keys and hashmap[i+1] > 0 and (i+2) in keys and hashmap[i+2] >0:
+            hashmap[i] -= 1
+            hashmap[i+1] -= 1
+            hashmap[i+2] -= 1
+            
+            if HandPower(hashmap, s+1, p) is True:
+                return True
+            hashmap[i] += 1
+            hashmap[i+1] += 1
+            hashmap[i+2] += 1
+        
+    return False
+print(WinningHand(Hand))
