@@ -1,0 +1,26 @@
+#P1 P2 P3 D1 D2 D3
+
+N = 3
+def permutations(N):
+    pick = [i+1 for i in range(0,N)]
+    drop = []
+    permute(pick, drop, '')
+
+def permute(pick, drop, output):
+    #print(output,pick,drop)
+    if len(pick)==0 and len(drop)==0:
+        print(output)
+        return
+     
+  
+    for i in range(len(pick)):
+       
+        permute(pick[:i]+pick[i+1:],drop + [pick[i]],output + ' P' + str(pick[i]))
+        
+    
+    for j in range(len(drop)):
+       
+        permute(pick, drop[:j] + drop[j+1:], output + ' D' + str(drop[j]))
+        
+
+permutations(N)
